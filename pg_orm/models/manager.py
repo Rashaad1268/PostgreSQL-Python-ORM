@@ -19,7 +19,8 @@ class Manager:
     def all(self) -> QuerySet:
         """Returns all rows in the table"""
         query = "SELECT * FROM {0};".format(self.model.table_name)
-        return self._return_query_set(
+        return QuerySet(
+            self.model,
             [self._return_model(row) for row in self.db.fetchall(query)]
         )
 
@@ -43,7 +44,8 @@ class Manager:
         query = "SELECT * FROM {0} WHERE {1};".format(
             self.model.table_name, " AND ".join(params)
         )
-        return self._return_query_set(
+        return QuerySet(
+            self.model,
             [
                 self._return_model(row)
                 for row in self.db.fetchall(query, *tuple(kwargs.values()))
@@ -61,7 +63,8 @@ class Manager:
         for key, value in kwargs.items():
             arguments[key] = f"%{value}%"
 
-        return self._return_query_set(
+        return QuerySet(
+            self.model,
             [
                 self._return_model(row)
                 for row in self.db.fetchall(query, *tuple(arguments.values()))
@@ -88,9 +91,6 @@ class Manager:
         else:
             return None
 
-    def _return_query_set(self, model_list):
-        return QuerySet(self.model, model_list)
-
 
 class AsyncManager(Manager):
     def __init__(self, model):
@@ -101,7 +101,8 @@ class AsyncManager(Manager):
     async def all(self) -> QuerySet:
         """Returns all rows in the table"""
         query = "SELECT * FROM {0};".format(self.model.table_name)
-        return self._return_query_set(
+        return QuerySet(
+            self.model,
             [self._return_model(row) for row in await self.db.fetch(query)]
         )
 
@@ -135,7 +136,8 @@ class AsyncManager(Manager):
         query = "SELECT * FROM {0} WHERE {1};".format(
             self.model.table_name, " AND ".join(params)
         )
-        return self._return_query_set(
+        return QuerySet(
+            self.model,
             [
                 self._return_model(row)
                 for row in await self.db.fetch(query, *tuple(kwargs.values()))
@@ -154,7 +156,8 @@ class AsyncManager(Manager):
             self.model.table_name, " AND ".join(params)
         )
 
-        return self._return_query_set(
+        return QuerySet(
+            self.model,
             [
                 self._return_model(row)
                 for row in await self.db.fetch(query, *tuple(kwargs.values()))
