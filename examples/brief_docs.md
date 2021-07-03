@@ -1,4 +1,5 @@
-## Just a brief documentation about the library
+## Just some brief documentation about the library
+This documentation will get replaced by actual documentation
 
 `Model.create_table` - Creates a table for the model if it doesn't exist already
 
