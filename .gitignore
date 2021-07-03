@@ -2,3 +2,5 @@
 .idea
 __pycache__/
 test_*.py
+Pipfile
+Pipfile.lock
