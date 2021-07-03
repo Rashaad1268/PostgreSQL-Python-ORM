@@ -64,7 +64,7 @@ class Model(metaclass=ModelBase):
                 raise FiledError(key, self._valid_fields)
             else:
                 setattr(self, key, val)
-        
+
         if not psycopg2:
             raise ModuleNotFoundError("Need to install psycopg2 for synchronous usage")
 
@@ -125,7 +125,7 @@ class Model(metaclass=ModelBase):
         return hash(self.id)
 
     def __eq__(self, other):
-        return isinstance(other, Model) and self.id == other.id
+        return isinstance(other, self.__class__) and self.id == other.id
 
     def __setattr__(self, name, value):
         if str(name) in self._valid_fields:
@@ -148,7 +148,7 @@ def create_model(
     return cls
 
 
-class AsyncModel(metaclass=ModelBase):
+class AsyncModel(Model, metaclass=ModelBase):
     """This is the model class which needs to be subclassed to use the async orm"""
 
     _is_sync = False
@@ -161,7 +161,7 @@ class AsyncModel(metaclass=ModelBase):
                 raise FiledError(key, self._valid_fields)
             else:
                 setattr(self, key, val)
-            
+
         if not asyncpg:
             raise ModuleNotFoundError("Need to install asyncpg for asynchronous usage")
 
@@ -213,28 +213,6 @@ class AsyncModel(metaclass=ModelBase):
         new_values = ", ".join(new_values)
         query = f"UPDATE {self.table_name} SET {new_values} WHERE Id=${count}"
         await self.db.execute(query, *tuple(attrs.values()), id)
-
-    def __repr__(self):
-        return "<%s: %s>" % (
-            self.__class__.__name__,
-            ", ".join([f"{k}={v!r}" for k, v in self.attrs.items()]),
-        )
-
-    def __hash__(self):
-        return hash(self.id)
-
-    def __eq__(self, other):
-        return isinstance(other, Model) and self.id == other.id
-
-    def __setattr__(self, name, value):
-        if str(name) in self._valid_fields:
-            self.attrs[name] = value
-            object.__setattr__(self, name, value)
-        else:
-            object.__setattr__(self, name, value)
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
 
 
 def create_async_model(pg_pool: asyncpg.Pool):
