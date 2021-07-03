@@ -154,13 +154,7 @@ class AsyncModel(Model, metaclass=ModelBase):
     _is_sync = False
 
     def __init__(self, **kwargs):
-        self.attrs = kwargs
-
-        for key, val in kwargs.items():
-            if key not in self._valid_fields:
-                raise FiledError(key, self._valid_fields)
-            else:
-                setattr(self, key, val)
+        super().__init__(**kwargs)
 
         if not asyncpg:
             raise ModuleNotFoundError("Need to install asyncpg for asynchronous usage")
