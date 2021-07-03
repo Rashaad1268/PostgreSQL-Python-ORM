@@ -13,4 +13,4 @@ ____
 
 And much more!
 _____
-Check out [here](https://github.com/Rashaad2168/PostgreSQL-Python-ORM) for examples on synchronous and asynchronous usage
+Check out [here](https://github.com/Rashaad1268/PostgreSQL-Python-ORM/tree/main/examples) for examples on synchronous and asynchronous usage
