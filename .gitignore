@@ -4,3 +4,4 @@ __pycache__/
 test_*.py
 Pipfile
 Pipfile.lock
+constants.py
