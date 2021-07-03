@@ -33,9 +33,10 @@ def apply_migrations(pool, sync_migrations=False, async_migrations=False):
             )
         with pool.getconn() as conn:
             for model in Model.__subclasses__():
-                log.debug(f"Creating table for model {model.__class__.__name__}")
-                model.create_table(conn)
-                log.debug(f"Created table for model {model.__class__.__name__}")
+                if model._is_sync:
+                    log.debug(f"Creating table for model {model.__class__.__name__}")
+                    model.create_table(conn)
+                    log.debug(f"Created table for model {model.__class__.__name__}")
         pool.putconn(conn)
 
     if async_migrations:
