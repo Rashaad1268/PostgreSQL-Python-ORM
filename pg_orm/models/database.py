@@ -44,11 +44,22 @@ class Psycopg2Driver:
                 if result:
                     column_names = [desc[0] for desc in cursor.description]
                     query_set = dict(zip(column_names, result))
-                else:
-                    query_set = {}
                 self.pool.putconn(conn)
 
-        return query_set
+        return query_set or {}
+
+    def fetchval(self, query, *args):
+        with self.pool.getconn() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query, args)
+                result = cursor.fetchone()
+                conn.commit()
+                if result:
+                    column_names = [desc[0] for desc in cursor.description]
+                    query_set = dict(zip(column_names, result))
+                self.pool.putconn(conn)
+
+        return query_set or {}
 
 
 class AsyncpgDriver:
@@ -78,11 +89,9 @@ class AsyncpgDriver:
             record = await conn.fetchrow(query, *args)
             if record:
                 query_set = {k: v for k, v in record.items()}
-            else:
-                query_set = {}
             await self.pool.release(conn)
 
-        return query_set
+        return query_set or {}
 
     async def fetchval(self, query, *args):
         async with self.pool.acquire() as conn:
