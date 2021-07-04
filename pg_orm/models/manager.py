@@ -94,7 +94,7 @@ class Manager:
                     if field.column_name == key:
                         validator(value)
 
-        instance_id = self.db.fetchone(query, *tuple(values), commit=True)["id"]
+        instance_id = self.db.fetchval(query, *tuple(values))["id"]
 
         kwargs["id"] = instance_id
         return self.model(**kwargs)
