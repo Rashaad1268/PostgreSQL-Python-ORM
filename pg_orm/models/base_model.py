@@ -93,8 +93,7 @@ class Model(metaclass=ModelBase):
 
     def save(self, commit: bool = True):
         """Saves the current model instace to the database"""
-        attrs = self.attrs.copy()
-        attrs.pop("id", None)  # The id will be automatically set
+        attrs = self.attrs
         table_name = self.table_name
         col_string = ", ".join(attrs.keys())
         param_string = ", ".join("%s" for _ in range(len(attrs.keys())))
@@ -195,8 +194,7 @@ class AsyncModel(Model, metaclass=ModelBase):
 
     async def save(self, commit: bool = True):
         """Saves the current model instance"""
-        attrs = self.attrs.copy()
-        attrs.pop("id", None)  # The id will be automatically set
+        attrs = self.attrs
         col_string = ", ".join(attrs.keys())
         param_string = ", ".join("%s" for _ in range(len(attrs.keys())))
 
