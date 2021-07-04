@@ -1,7 +1,7 @@
 import datetime
 import logging
 import inspect
-from typing import Optional, Any
+from typing import Optional, Any, Callable, Union
 
 from pg_orm.errors import SchemaError
 from pg_orm.models.utils import PythonToSQLConverter as PyToSQL
@@ -14,17 +14,23 @@ class Empty:
 
 
 class Field:
-    python = None  # The data type in python
+    python = None  # The field data type in python
 
-    def __init__(self, null: bool = False, unique: bool = False, default: Any = None):
+    def __init__(
+        self,
+        null: bool = False,
+        unique: bool = False,
+        default: Any = None,
+        default_insertion_value: Optional[Callable] = lambda: None,
+        validators: Union[list[Callable], tuple[Callable]] = [],
+    ):
         self.column_name = None
+        self.data_validators = validators
         self.is_unique = unique
         self.primary_key = False
         self.nullable = null  # Fields aren't nullable by default
         self.default = default
-
-        if default and unique:
-            raise ValueError("Unique columns cannot have a default value.")
+        self.default_insertion_value = default_insertion_value
 
     def __copy__(self):
         new = Empty()
@@ -88,6 +94,7 @@ class IntegerField(Field):
     def to_sql(self):
         null = ""
         unique = ""
+        pg_type = "INTEGER"
         if not self.nullable:
             null = " NOT NULL"
         if self.is_unique:
@@ -95,15 +102,16 @@ class IntegerField(Field):
 
         if self.auto_increment:
             if self.big_int:
-                return "BIGSERIAL"
-            if self.small_int:
-                return "SMALLSERIAL"
-            return "SERIAL"
-        elif self.big_int:
-            return f"BIGINT{unique}{null}"
+                pg_type = "BIGSERIAL"
+            elif self.small_int:
+                pg_type = "SMALLSERIAL"
+            pg_type = "SERIAL"
+        if self.big_int:
+            pg_type = "BIGINT"
         elif self.small_int:
-            return f"SMALLINT{unique}{null}"
-        return f"INTEGER{unique}{null}{self._get_default_val()}"
+            pg_type = "SMALLINT"
+
+        return f"{pg_type}{unique}{null}{self._get_default_val()}"
 
     def is_real_type(self):
         return not self.auto_increment
@@ -116,7 +124,11 @@ class AutoIncrementIDField(IntegerField):
 
     def __init__(self, small_int: bool = False, big_int: bool = False, null=True):
         super().__init__(
-            big_int=big_int, small_int=small_int, auto_increment=True, null=null
+            big_int=big_int,
+            small_int=small_int,
+            auto_increment=True,
+            null=null,
+            unique=True,
         )
 
     def is_real_type(self):
@@ -228,3 +240,31 @@ class BooleanField(Field):
         if self.is_unique:
             unique = " UNIQUE"
         return f"BOOL{unique}{null}{self._get_default_val()}"
+
+
+class ForeignKey(Field):
+    def __init__(
+        self, to, on_delete: str, sql_type: Optional[str] = "INTEGER", **kwargs
+    ):
+        super().__init__(**kwargs)
+
+        options = (
+            "NO ACTION",
+            "RESTRICT",
+            "CASCADE",
+            "SET NULL",
+            "SET DEFAULT",
+        )
+        if on_delete.upper() not in options:
+            raise SchemaError("Invalid action passed in on_delete")
+
+        self.to = to
+        self.sql_type = sql_type
+        self.on_delete = on_delete.upper()
+
+    def to_sql(self):
+        sql = "{0.sql_type} REFERENCES {0.to.table_name}(Id) " "ON DELETE {0.on_delete}"
+        return sql.format(self)
+
+    def is_real_type(self):
+        return False
