@@ -99,7 +99,20 @@ class Model(metaclass=ModelBase):
         param_string = ", ".join("%s" for _ in range(len(attrs.keys())))
         query = f"INSERT INTO {table_name} ({col_string}) VALUES({param_string})"
 
-        self.db.execute(query, *tuple(attrs.values()), commit=commit)
+        values = []
+        for v in attrs.values():
+            if isinstance(v, Model):
+                values.append(v.id)
+            else:
+                values.append(v)
+
+        for field in self.model.fields:
+            for validator in field.data_validators:
+                for key, value in attrs.items():
+                    if field.column_name == key:
+                        validator(value)
+
+        self.db.execute(query, *tuple(values), commit=commit)
 
     def delete(self, commit: bool = True):
         """Deletes the current model instance from the database"""
@@ -185,9 +198,23 @@ class AsyncModel(Model, metaclass=ModelBase):
         attrs.pop("id", None)  # The id will be automatically set
         col_string = ", ".join(attrs.keys())
         param_string = ", ".join("%s" for _ in range(len(attrs.keys())))
+
+        values = []
+        for v in attrs.values():
+            if isinstance(v, Model):
+                values.append(v.id)
+            else:
+                values.append(v)
+
+        for field in self.model.fields:
+            for validator in field.data_validators:
+                for key, value in attrs.items():
+                    if field.column_name == key:
+                        validator(value)
+
         query = f"INSERT INTO {self.table_name} ({col_string}) VALUES({param_string})"
 
-        await self.db.execute(query, *tuple(attrs.values()))
+        await self.db.execute(query, *tuple(values))
 
     async def delete(self):
         """Deletes the current model instance"""
