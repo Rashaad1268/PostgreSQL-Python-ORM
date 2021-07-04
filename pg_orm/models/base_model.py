@@ -11,6 +11,7 @@ except ImportError:
 
 import traceback
 import typing as t
+import asyncio
 import logging
 
 from pg_orm.errors import FiledError
@@ -210,7 +211,10 @@ class AsyncModel(Model, metaclass=ModelBase):
             for validator in field.data_validators:
                 for key, value in attrs.items():
                     if field.column_name == key:
-                        validator(value)
+                        if asyncio.iscoroutinefunction(validator):
+                            await validator(value)
+                        else:
+                            validator(value)
 
         query = f"INSERT INTO {self.table_name} ({col_string}) VALUES({param_string})"
 
