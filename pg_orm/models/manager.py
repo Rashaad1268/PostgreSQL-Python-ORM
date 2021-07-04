@@ -7,6 +7,7 @@ try:
 except ImportError:
     asyncpg = None
 
+from pg_orm import models
 from pg_orm.models.queryset import QuerySet
 
 
@@ -20,8 +21,7 @@ class Manager:
         """Returns all rows in the table"""
         query = "SELECT * FROM {0};".format(self.model.table_name)
         return QuerySet(
-            self.model,
-            [self._return_model(row) for row in self.db.fetchall(query)]
+            self.model, [self._return_model(row) for row in self.db.fetchall(query)]
         )
 
     def get(self, id=None, **kwargs):
@@ -49,7 +49,7 @@ class Manager:
             [
                 self._return_model(row)
                 for row in self.db.fetchall(query, *tuple(kwargs.values()))
-            ]
+            ],
         )
 
     def search(self, **kwargs) -> QuerySet:
@@ -68,7 +68,7 @@ class Manager:
             [
                 self._return_model(row)
                 for row in self.db.fetchall(query, *tuple(arguments.values()))
-            ]
+            ],
         )
 
     def create(self, **kwargs):
@@ -81,7 +81,21 @@ class Manager:
         param_string = ", ".join("%s" for _ in range(len(kwargs.keys())))
         query = f"INSERT INTO {table_name} ({col_string}) VALUES({param_string}) RETURNING Id;"
 
-        instance_id = self.db.fetchone(query, *tuple(kwargs.values()))["id"]
+        values = []
+        for v in kwargs.values():
+            if isinstance(v, models.base_model.Model):
+                values.append(v.id)
+            else:
+                values.append(v)
+
+        for field in self.model.fields:
+            for validator in field.data_validators:
+                for key, value in kwargs.items():
+                    if field.column_name == key:
+                        validator(value)
+
+        instance_id = self.db.fetchone(query, *tuple(values), commit=True)["id"]
+
         kwargs["id"] = instance_id
         return self.model(**kwargs)
 
@@ -102,8 +116,7 @@ class AsyncManager(Manager):
         """Returns all rows in the table"""
         query = "SELECT * FROM {0};".format(self.model.table_name)
         return QuerySet(
-            self.model,
-            [self._return_model(row) for row in await self.db.fetch(query)]
+            self.model, [self._return_model(row) for row in await self.db.fetch(query)]
         )
 
     async def get(self, id=None, **kwargs):
@@ -141,7 +154,7 @@ class AsyncManager(Manager):
             [
                 self._return_model(row)
                 for row in await self.db.fetch(query, *tuple(kwargs.values()))
-            ]
+            ],
         )
 
     async def search(self, **kwargs) -> QuerySet:
@@ -161,7 +174,7 @@ class AsyncManager(Manager):
             [
                 self._return_model(row)
                 for row in await self.db.fetch(query, *tuple(kwargs.values()))
-            ]
+            ],
         )
 
     async def create(self, **kwargs):
@@ -177,6 +190,20 @@ class AsyncManager(Manager):
             params.append(f"${count}")
             count += 1
         param_string = ", ".join(params)
+
+        values = []
+        for v in kwargs.values():
+            if isinstance(v, models.base_model.Model):
+                values.append(v.id)
+            else:
+                values.append(v)
+
+        for field in self.model.fields:
+            for validator in field.data_validators:
+                for key, value in kwargs.items():
+                    if field.column_name == key:
+                        validator(value)
+
         query = f"INSERT INTO {table_name} ({col_string}) VALUES({param_string}) RETURNING Id;"
 
         instance_id = await self.db.fetchval(query, *tuple(kwargs.values()))
