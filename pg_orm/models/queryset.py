@@ -15,8 +15,15 @@ class QuerySet:
     def order_by(self, **kwargs):
         raise NotImplementedError()
 
+    @property
+    def raw(self):
+        return self.query_set
+
     def __iter__(self):
         yield from self.query_set
+
+    def __contains__(self, item):
+        return item in self.query_set
 
     def __repr__(self):
         return "<%s %s>" % (self.__class__.__name__, self.query_set)
@@ -29,6 +36,9 @@ class QuerySet:
 
     def __getitem__(self, key):
         return self.query_set[key]
+    
+    def __setitem(self, key, value):
+        self.query_set[key] = value
 
     def __delitem__(self, key):
         del self.query_set[key]
