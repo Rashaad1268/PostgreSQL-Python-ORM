@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 
 async def apply_async_migrations(pool):
     async with pool.acquire() as conn:
-        for model in AsyncModel.__subclasses__():
+        for model in AsyncModel.subclasses():
             log.debug(f"Creating table for model {model.__class__.__name__}")
             await model.create_table(conn)
             log.debug(f"Created table for model {model.__class__.__name__}")
@@ -32,7 +32,7 @@ def apply_migrations(pool, *, sync_migrations: bool=False, async_migrations: boo
                 "Pool must be instance of psycopg2.pool.AbstractConnectionPool"
             )
         with pool.getconn() as conn:
-            for model in Model.__subclasses__():
+            for model in Model.subclasses():
                 if model._is_sync:
                     log.debug(f"Creating table for model {model.__class__.__name__}")
                     model.create_table(conn)
