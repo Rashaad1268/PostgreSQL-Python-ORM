@@ -7,7 +7,7 @@ README = pathlib.Path(r"C:\Users\Rushda Niyas\Desktop\Rashaad\Programming\postgr
 # This call to setup() does all the work
 setuptools.setup(
     name="pg_orm",
-    version="0.5.0",
+    version="0.5.1",
     description="An ORM for PostgreSQL",
     long_description=README,
     packages=setuptools.find_packages(),
