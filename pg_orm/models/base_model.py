@@ -128,6 +128,10 @@ class Model(metaclass=ModelBase):
         query = f"UPDATE {self.table_name} SET {new_values} WHERE Id=%s"
         self.db.execute(query, *tuple(attrs.values()), id, commit=commit)
 
+    @classmethod
+    def subclasses(cls):
+        return cls.__subclasses__()
+
     def __repr__(self):
         return "<%s: %s>" % (
             self.__class__.__name__,
