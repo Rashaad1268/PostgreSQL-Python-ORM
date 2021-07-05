@@ -55,7 +55,7 @@ class Field:
         raise NotImplementedError()
 
     def _get_default_val(self):
-        if self.default:
+        if self.default is not None:
             de = self.default
             if inspect.ismethod(de) or inspect.isfunction(de) or inspect.isbuiltin(de):
                 return f" DEFAULT {PyToSQL.convert(de())}"
