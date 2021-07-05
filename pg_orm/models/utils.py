@@ -4,7 +4,7 @@ from distutils.util import strtobool
 class PythonToSQLConverter:
     @staticmethod
     def convert(arg=None):
-        if not arg:
+        if arg is None:
             return ""
         arg = str(arg)
         try:
