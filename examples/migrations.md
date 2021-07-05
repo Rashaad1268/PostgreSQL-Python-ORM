@@ -4,6 +4,8 @@ For the migrations you need to make a new file called `migrations.py`
 from pg_orm import migrations
 from psycopg2 import pool
 
+from models import Model # The Model variable in the models file which you create your models in
+
 pg_pool = pool.SimpleConnectionPool(**data)
 migrations.apply_migrations(pg_pool)
 ```
