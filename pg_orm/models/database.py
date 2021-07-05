@@ -72,15 +72,17 @@ class AsyncpgDriver:
     async def fetch(self, query, *args):
         async with self.pool.acquire() as conn:
             result = await conn.fetch(query, *args)
-            query_set = [{k: v for k, v in record.items()} for record in result] or {}
+            for record in result:
+                record = record or {}
+                query_set = {k: v for k, v in record.items()}
             await self.pool.release(conn)
 
         return query_set
 
     async def fetchrow(self, query, *args):
         async with self.pool.acquire() as conn:
-            record = await conn.fetchrow(query, *args)
-            query_set = {k: v for k, v in record.items()} or {}
+            record = await conn.fetchrow(query, *args) or {}
+            query_set = {k: v for k, v in record.items()}
             await self.pool.release(conn)
 
         return query_set
