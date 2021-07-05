@@ -27,11 +27,9 @@ class Psycopg2Driver:
             with conn.cursor() as cursor:
                 cursor.execute(query, args)
                 result = cursor.fetchall()
-                if result:
-                    column_names = [desc[0] for desc in cursor.description]
-                    query_set = [dict(zip(column_names, row)) for row in result]
-                else:
-                    query_set = {}
+                column_names = [desc[0] for desc in cursor.description]
+                query_set = [dict(zip(column_names, row)) for row in result] or {}
+
                 self.pool.putconn(conn)
 
         return query_set
@@ -41,12 +39,11 @@ class Psycopg2Driver:
             with conn.cursor() as cursor:
                 cursor.execute(query, args)
                 result = cursor.fetchone()
-                if result:
-                    column_names = [desc[0] for desc in cursor.description]
-                    query_set = dict(zip(column_names, result))
+                column_names = [desc[0] for desc in cursor.description]
+                query_set = dict(zip(column_names, result)) or {}
                 self.pool.putconn(conn)
 
-        return query_set or {}
+        return query_set
 
     def fetchval(self, query, *args):
         with self.pool.getconn() as conn:
@@ -54,12 +51,11 @@ class Psycopg2Driver:
                 cursor.execute(query, args)
                 result = cursor.fetchone()
                 conn.commit()
-                if result:
-                    column_names = [desc[0] for desc in cursor.description]
-                    query_set = dict(zip(column_names, result))
+                column_names = [desc[0] for desc in cursor.description]
+                query_set = dict(zip(column_names, result)) or {}
                 self.pool.putconn(conn)
 
-        return query_set or {}
+        return query_set
 
 
 class AsyncpgDriver:
@@ -76,10 +72,7 @@ class AsyncpgDriver:
     async def fetch(self, query, *args):
         async with self.pool.acquire() as conn:
             result = await conn.fetch(query, *args)
-            if result:
-                query_set = [{k: v for k, v in record.items()} for record in result]
-            else:
-                query_set = {}
+            query_set = [{k: v for k, v in record.items()} for record in result] or {}
             await self.pool.release(conn)
 
         return query_set
@@ -87,11 +80,10 @@ class AsyncpgDriver:
     async def fetchrow(self, query, *args):
         async with self.pool.acquire() as conn:
             record = await conn.fetchrow(query, *args)
-            if record:
-                query_set = {k: v for k, v in record.items()}
+            query_set = {k: v for k, v in record.items()} or {}
             await self.pool.release(conn)
 
-        return query_set or {}
+        return query_set
 
     async def fetchval(self, query, *args):
         async with self.pool.acquire() as conn:
