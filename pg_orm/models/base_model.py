@@ -200,7 +200,12 @@ class AsyncModel(Model, metaclass=ModelBase):
         """Saves the current model instance"""
         attrs = self.attrs
         col_string = ", ".join(attrs.keys())
-        param_string = ", ".join("%s" for _ in range(len(attrs.keys())))
+        params = []
+        count = 1
+        for _ in range(len(attrs.keys())):
+            params.append(f"${count}")
+            count += 1
+        param_string = ", ".join(params)
 
         values = []
         for v in attrs.values():
