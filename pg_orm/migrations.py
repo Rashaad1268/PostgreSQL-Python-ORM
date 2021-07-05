@@ -8,9 +8,9 @@ except ImportError:
     AbstractConnectionPool = None
 
 try:
-    from asyncpg import Pool
+    import asyncpg
 except ImportError:
-    Pool = None
+    asyncpg = None
 
 log = logging.getLogger(__name__)
 
@@ -19,12 +19,12 @@ async def apply_async_migrations(pool):
     async with pool.acquire() as conn:
         for model in AsyncModel.__subclasses__():
             log.debug(f"Creating table for model {model.__class__.__name__}")
-            model.create_table(conn)
+            await model.create_table(conn)
             log.debug(f"Created table for model {model.__class__.__name__}")
     await pool.release(conn)
 
 
-def apply_migrations(pool, sync_migrations=False, async_migrations=False):
+def apply_migrations(pool, *, sync_migrations: bool=False, async_migrations: bool=False):
     """Makes tables for the models"""
     if sync_migrations:
         if not isinstance(pool, AbstractConnectionPool):
@@ -40,7 +40,7 @@ def apply_migrations(pool, sync_migrations=False, async_migrations=False):
         pool.putconn(conn)
 
     if async_migrations:
-        if not isinstance(pool, Pool):
+        if not isinstance(pool, asyncpg.Pool):
             raise TypeError("Pool must be instance of asyncpg.Pool")
         for model in AsyncModel.__subclasses__():
             run = asyncio.get_event_loop().run_until_complete
