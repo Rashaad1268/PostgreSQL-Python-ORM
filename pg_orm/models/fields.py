@@ -235,7 +235,7 @@ class BooleanField(Field):
         null = " NOT NULL"
         unique = ""
 
-        if self.is_nullable:
+        if self.nullable:
             null = " NULL"
         if self.is_unique:
             unique = " UNIQUE"
