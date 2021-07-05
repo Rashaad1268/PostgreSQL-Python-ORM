@@ -106,7 +106,7 @@ class Model(metaclass=ModelBase):
             else:
                 values.append(v)
 
-        for field in self.model.fields:
+        for field in self.fields:
             for validator in field.data_validators:
                 for key, value in attrs.items():
                     if field.column_name == key:
@@ -209,7 +209,7 @@ class AsyncModel(Model, metaclass=ModelBase):
             else:
                 values.append(v)
 
-        for field in self.model.fields:
+        for field in self.fields:
             for validator in field.data_validators:
                 for key, value in attrs.items():
                     if field.column_name == key:
