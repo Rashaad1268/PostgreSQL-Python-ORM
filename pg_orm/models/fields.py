@@ -21,7 +21,7 @@ class Field:
         null: bool = False,
         unique: bool = False,
         default: Any = None,
-        default_insertion_value: Optional[Callable] = lambda: None,
+        default_insertion_value: Optional[Callable] = None,
         validators: Union[list[Callable], tuple[Callable]] = [],
     ):
         self.column_name = None
@@ -244,7 +244,7 @@ class BooleanField(Field):
 
 class ForeignKey(Field):
     def __init__(
-        self, to, on_delete: str, sql_type: Optional[str] = "INTEGER", **kwargs
+        self, to, on_delete: str, sql_type: Optional[str] = "INTEGER", column: str="Id", **kwargs
     ):
         super().__init__(**kwargs)
 
@@ -260,11 +260,41 @@ class ForeignKey(Field):
 
         self.to = to
         self.sql_type = sql_type
+        self.column = column
         self.on_delete = on_delete.upper()
 
     def to_sql(self):
-        sql = "{0.sql_type} REFERENCES {0.to.table_name}(Id) " "ON DELETE {0.on_delete}"
+        sql = "{0.sql_type} REFERENCES {0.to.table_name}({0.column}) " "ON DELETE {0.on_delete}"
         return sql.format(self)
 
     def is_real_type(self):
         return False
+
+
+class JsonField(Field):
+    python = dict
+
+    def to_sql(self):
+        null = ""
+        unique = ""
+        if not self.nullable:
+            null = " NOT NULL"
+        if self.is_unique:
+            unique = " UNIQUE"
+
+        return f"JSON {unique}{null}{self._get_default_val()}"
+
+
+
+class BinaryField(Field):
+    python = bytes
+
+    def to_sql(self):
+        null = ""
+        unique = ""
+        if not self.nullable:
+            null = " NOT NULL"
+        if self.is_unique:
+            unique = " UNIQUE"
+
+        return f"BYTEA {unique}{null}{self._get_default_val()}"
