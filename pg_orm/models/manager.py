@@ -83,7 +83,7 @@ class Manager:
 
         values = []
         for v in kwargs.values():
-            if isinstance(v, models.base_model.Model):
+            if isinstance(v, (models.base_model.Model, models.base_model.AsyncModel)):
                 values.append(v.id)
             else:
                 values.append(v)
@@ -193,7 +193,7 @@ class AsyncManager(Manager):
 
         values = []
         for v in kwargs.values():
-            if isinstance(v, models.base_model.Model):
+            if isinstance(v, (models.base_model.Model, models.base_model.AsyncModel)):
                 values.append(v.id)
             else:
                 values.append(v)
