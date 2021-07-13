@@ -209,7 +209,7 @@ class AsyncModel(Model, metaclass=ModelBase):
 
         values = []
         for v in attrs.values():
-            if isinstance(v, Model):
+            if isinstance(v, (AsyncModel, Model)):
                 values.append(v.id)
             else:
                 values.append(v)
