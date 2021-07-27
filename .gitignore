@@ -1,7 +1,9 @@
 .vscode
 .idea
 __pycache__/
-test_*.py
+test_code*.py
 Pipfile
 Pipfile.lock
 constants.py
+.pytest_cache/
+test_migrations/
