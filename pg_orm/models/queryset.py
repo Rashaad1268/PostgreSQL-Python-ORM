@@ -1,44 +1,29 @@
-class QuerySet:
+class QuerySet(list):
     def __init__(self, model, query_set):
         self.model = model
-        self.query_set = list(query_set)
+        super().__init__(query_set)
     
     def append(self, model):
         if isinstance(model, self.model):
-            self.query_set.append(model)
+            super().append(model)
         else:
             raise TypeError
 
     def count(self):
-        return len(self.query_set)
+        return len(self)
 
-    def order_by(self, **kwargs):
-        raise NotImplementedError()
+    def order_by(self, attribute):
+        if hasattr(self.model, attribute):
+            self.sort(key=lambda m: m.attribute)
+        else:
+            raise AttributeError(f"{self.model.__name__} has no attribute {attribute} to order by")
 
     @property
     def raw(self):
-        return self.query_set
-
-    def __iter__(self):
-        yield from self.query_set
-
-    def __contains__(self, item):
-        return item in self.query_set
+        return self
 
     def __repr__(self):
-        return "<%s %s>" % (self.__class__.__name__, self.query_set)
+        return "<%s %s>" % (self.__class__.__name__, self)
 
     def __eq__(self, other):
-        return isinstance(other, QuerySet) and self.query_set == other.query_set
-
-    def __len__(self):
-        return len(self.query_set)
-
-    def __getitem__(self, key):
-        return self.query_set[key]
-    
-    def __setitem(self, key, value):
-        self.query_set[key] = value
-
-    def __delitem__(self, key):
-        del self.query_set[key]
+        return isinstance(other, QuerySet) and self.model == other.model and self.query_set == other.query_set
