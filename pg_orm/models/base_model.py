@@ -49,8 +49,7 @@ class ModelBase(type):
 
         new_class = super().__new__(cls, name, bases, new_attrs)
         new_class._query_gen = QueryGenerator(new_class)
-
-        model_is_sync = getattr(new_class, "_is_sync", True)
+        model_is_sync = getattr(new_class, "_is_sync")
 
         if model_is_sync:
             new_class.objects = Manager(new_class)
@@ -66,6 +65,11 @@ class Model(metaclass=ModelBase, table_name="Model"):
     fields: t.Tuple[Field]
     table_name: str
     _valid_fields: t.Iterable
+
+    @classmethod
+    @property
+    def _is_sync(cls):
+        return False
 
     def __init__(self, **kwargs):
         self.attrs = kwargs
@@ -187,6 +191,7 @@ def create_model(
 class AsyncModel(Model, metaclass=ModelBase, table_name="AsyncModel"):
     """This is the model class which needs to be subclassed to use the async orm"""
 
+    @classmethod
     @property
     def _is_sync(self):
         return False
