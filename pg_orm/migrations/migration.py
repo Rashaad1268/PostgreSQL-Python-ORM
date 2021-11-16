@@ -65,8 +65,8 @@ def migrate(cls: Model, directory="migrations", print_query: bool = False):
     _write_migrations(cls, directory)  # At last synchronize the json files with the current state of the Model
 
 
-def migrate_all(cls: Model, directory="migrations", print_query: bool = False):
-    for model in cls.__subclasses__():
+def migrate_all(directory="migrations", print_query: bool = False):
+    for model in Model.__subclasses__():
         migrate(model, directory, print_query)
 
 
@@ -99,6 +99,6 @@ async def async_migrate(cls: AsyncModel, directory="migrations", print_query: bo
     _write_migrations(cls, directory)  # At last synchronize the json files with the current state of the Model
 
 
-async def async_migrate_all(cls: AsyncModel, directory="migrations", print_query: bool = False):
-    for model in cls.__subclasses__():
+async def async_migrate_all(directory="migrations", print_query: bool = False):
+    for model in AsyncModel.__subclasses__():
         await async_migrate(model, directory, print_query)
