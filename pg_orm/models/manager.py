@@ -93,7 +93,7 @@ class AsyncManager(Manager):
             kwargs["id"] = id
         query, args = self.model._query_gen.generate_select_query(True, **kwargs)
         return self._return_model(
-            await self.db.fetchrow(query, *tuple(kwargs.values()))
+            await self.db.fetchrow(query, *args)
         )
 
     async def filter(self, **kwargs):
