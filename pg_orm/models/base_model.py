@@ -69,7 +69,6 @@ class Model(metaclass=ModelBase, table_name="Model"):
 
     def __init__(self, **kwargs):
         self.attrs = kwargs
-        print(self.fields)
 
         for key, val in kwargs.items():
             if key not in self._valid_fields:
@@ -214,8 +213,7 @@ class AsyncModel(Model, metaclass=ModelBase, table_name="AsyncModel"):
 
     async def delete(self):
         """Deletes the current model instance"""
-        id = self.attrs.get("id", None)
-        query = f"DELETE FROM {self.table_name} WHERE Id=$1;"
+        query, id = self._query_gen.generate_row_deletion_query(True, **kwargs)
         await self.db.execute(query, id)
 
     async def update(self):
