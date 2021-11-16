@@ -1,6 +1,6 @@
 ```python
 # models.py file
-from pg_orm import models
+from pg_orm import models, migrate
 from psycopg2 import pool
 
 uri = "postgresql://user:password_1234@127.0.0.1:5432/postgres"
@@ -14,7 +14,10 @@ class Post(Model):
     body = models.TextField()
     date_created = models.DateTimeField(auto_now_add=True) # Now the date_created will be automatically set
 
+migrate(Post)
+
 pg_pool.closeall() # Close the pool at last
 ```
+
 Congratulations you have created a Model, as simple as that  
 Refer to `rows.md` if you want to know about handling rows

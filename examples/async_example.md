@@ -3,7 +3,7 @@
 import asyncpg
 import asyncio
 
-from pg_orm import models
+from pg_orm import models, async_migrate
 
 run = asyncio.get_event_loop().run_until_complete
 
@@ -18,7 +18,14 @@ class Post(Model):
     body = models.TextField()
     date_created = models.DateTimeField(auto_now_add=True) # Now the date_created will be automatically set
 
+run(async_migrate(Post))
+
 run(pg_pool.close()) # Close the pool at last
 ```
-Congratulations you have created a Model, as simple as that  
-Refer to `rows.md` if you want to know about handling rows
+
+Congratulations you have created a Model!  
+
+Check [`migrations.md`](https://github.com/Rashaad1268/PostgreSQL-Python-ORM/blob/main/examples/migrations.md)
+on applying the migrations
+and [`rows.md`](https://github.com/Rashaad1268/PostgreSQL-Python-ORM/blob/main/examples/rows.md)
+on querying the database

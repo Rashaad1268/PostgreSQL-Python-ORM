@@ -16,6 +16,12 @@ class QueryGenerator:
 
     def generate_insert_query(self, return_inserted=False, asyncpg=False, **kwargs):
         model = self.model
+        values = []
+        for v in kwargs.values():
+            if isinstance(v, pg_orm.models.base_model.Model):
+                values.append(v.id)
+            else:
+                values.append(v)
 
         if not asyncpg:
             col_string = ", ".join(kwargs.keys())
@@ -25,25 +31,19 @@ class QueryGenerator:
             if return_inserted:
                 query += " RETURNING *"
 
-            values = []
-            for v in kwargs.values():
-                if isinstance(v, pg_orm.models.base_model.Model):
-                    values.append(v.id)
-                else:
-                    values.append(v)
-
-            return query, tuple(values)  # Make the values immutable
+            return query, values
 
         else:
+
             col_string = ", ".join(kwargs.keys())
-            params = self._get_asyncpg_values(kwargs)
+            params = self._get_asyncpg_values(values)
             param_string = ", ".join(params)
 
             query = f"INSERT INTO {model.table_name} ({col_string}) VALUES({param_string})"
             if return_inserted:
                 query += " RETURNING *"
 
-            return query
+            return query, values
 
     def generate_update_query(self, asyncpg=False, **kwargs):
         self._check_id(kwargs, "update")
@@ -58,6 +58,7 @@ class QueryGenerator:
             values = self._get_asyncpg_values(kwargs)
             new_values = ", ".join(values)
             query = f"UPDATE {self.table_name} SET {new_values} WHERE id=${len(values) + 1}"
+            return query, tuple(kwargs.values), id
 
     def generate_row_deletion_query(self, asyncpg=False, *, column="id", **kwargs):
         # column is a key word argument to prevent it being accidentally passed in
@@ -87,8 +88,11 @@ class QueryGenerator:
         if data.get("id") is None:
             raise Exception(f"Cannot {operation} row without id specified.")
 
-    def _get_asyncpg_values(self, data: dict):
-        return [f"{k}={i + 1}$" for i, k in enumerate(data.keys())]
+    def _get_asyncpg_values(self, data):
+        if isinstance(data, dict):
+            return [f"{k}=${i + 1}" for i, k in enumerate(data.keys())]
+        elif isinstance(data, list):
+            return [f"${i + 1}" for i, k in enumerate(data)]
 
     def _get_psycopg2_values(self, data: dict):
         return [f"{k}=%s" for k in data.keys()]

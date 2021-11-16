@@ -212,18 +212,17 @@ class AsyncModel(Model, metaclass=ModelBase, table_name="AsyncModel"):
 
     async def save(self, commit: bool = True):
         """Saves the current model instance"""
-        query, values = self._query_gen.generate_insert_query()
-
+        query, values = self._query_gen.generate_insert_query(asyncpg=True, **self.attrs)
         await self.db.execute(query, *values)
 
     async def delete(self):
         """Deletes the current model instance"""
-        query, id = self._query_gen.generate_row_deletion_query(True, **kwargs)
+        query, id = self._query_gen.generate_row_deletion_query(True, **self.attrs)
         await self.db.execute(query, id)
 
     async def update(self):
         """Updates the model instace in the database with the current instance"""
-        query, args, id = self._query_gen.generate_update_query(**self.attrs)
+        query, args, id = self._query_gen.generate_update_query(True, **self.attrs)
         await self.db.execute(query, *args, id)
 
 

@@ -1,24 +1,74 @@
-## Just some brief documentation about the library
+# Brief documentation about the library
+
 This documentation will get replaced by actual documentation
 
-`Model.create_table` - Creates a table for the model if it doesn't exist already
+----
 
-`Model.save` - Saves the current model istance to the database
+## `class pg_orm.models.Model`
 
-`Model.delete` - Deletes the current model instace from the database
+The base class of models
 
-`Model.update` - Updates the model insatace in the database to the current instance
+### `save(commit=True)`
 
-`Model.__eq__` - Compares to model objects by the class and the id
+Saves the current model istance to the database
 
-`Model.__hash__` - Returns the hash of the models id
+### `delete(commit=True)`
 
-`Model.objects.all` - Returns all the rows in the database
+Deletes the current instace from the database
 
-`Model.objects.get` - Returns a single row from the database with the given attributes
+### `update(commit=True)`
 
-`Model.objects.filter` - Returns multiple rows from the database with the given attributes
+Updates the model insatace in the database to the current instance
 
-`Model.objects.search` - Run a SQL search query and returns the rows which match the query
+### `__eq__(other)`
 
-`Model.objects.create` - Creates a new row in the database with the given attributes and returns a model instance of it
+Compares to model objects by the class and the id
+
+### `__hash__()`
+
+Returns the hash of the models id
+
+## `class pg_orm.models.AsyncModel`
+
+Same as model but the following methods are async and should be `await`ed
+
+- `save`
+- `delete`
+- `update`
+
+## `class pg_orm.models.manager.Manager(model)`
+
+The default manager of a [`pg_orm.models.Model`](#class-pg_orm.models.model).
+The manager is responsible for querying the table.
+
+The manager can be access through `Model.objects`
+
+### `all() -> QuerySet`
+
+Returns all the rows in the table
+
+### `get(id=None, **kwargs) -> Model`
+
+Returns a single row from the table with the given arguments
+
+### `filter(**kwargs) -> QuerySet`
+
+Returns multiple rows from the from with the given arguments
+
+### `search(**kwargs) -> QuerySet`
+
+Runs a SQL search query and returns the rows which match the given arguments
+
+### `create(**kwargs) -> Model`
+
+Creates a new row with the given arguments and returns a model instance of it
+
+## `class pg_orm.models.manager.AsyncManager(model)`
+
+Same as [`Manager`](#class-pg_orm.models.manager.manager) but the following methods are async and should be `await`ed
+
+- `all`
+- `get`
+- `filter`
+- `search`
+- `create`

@@ -1,17 +1,40 @@
-For the migrations you need to make a new file called `migrations.py`
+# Applying migrations
+
+Applying the migrations will apply any changes in your code to the database.
+
+----
+
+> It is recommended to create a new file named `migrations.py`
+
+If you are using `pg_orm.models.Model`
+
 ```python
 # migrations.py
-from pg_orm import migrations
-from psycopg2 import pool
+from pg_orm.migrations.migration import migrate
 
-from models import Model # The Model variable in the models file which you create your models in
-
-pg_pool = pool.SimpleConnectionPool(**data)
-migrations.apply_migrations(pg_pool)
+migrate(Post)  # Pass in the model class
 ```
-Or you can use Model.create_table to create the table for the model 
+
+The above method can be used to apply migrations for a single model.
+
+If you want to apply migrations to all of your models
+
 ```python
-with pg_pool.getconn() as conn:
-    Post.create_table(conn)
-    pg_pool.putconn(conn)
+# migrations.py
+from pg_orm import migrate
+
+migrate_all()  # This will apply migrations for all of your models which subclass this class
 ```
+
+If you are using `pg_orm.models.AsyncModel`
+
+```python
+# migrations.py
+from pg_orm import async_migrate
+from asyncio import get_event_loop
+
+# async_migrate is a coroutine
+get_event_loop().run_until_complete(async_migrate(Post))  # Pass in the model class
+```
+
+If you want to apply migrations to all of the models use `pg_orm.async_migrate_all`

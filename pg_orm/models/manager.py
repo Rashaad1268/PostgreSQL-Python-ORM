@@ -119,21 +119,20 @@ class AsyncManager(Manager):
         query = "SELECT * FROM {0} WHERE {1};".format(
             self.model.table_name, " AND ".join(params)
         )
-
         return QuerySet(
             self.model,
             [
                 self._return_model(row)
                 for row in await self.db.fetch(query, *tuple(kwargs.values()))
-            ],
-        )
+            ]
+          )
 
     async def create(self, **kwargs):
         """
         Creates and returns new model instance with the given values and saves it in the database
         """
         self.model(**kwargs)
-        query, values = self.model._query_gen.generate_insert_query(True, **kwargs)
+        query, values = self.model._query_gen.generate_insert_query(True, asyncpg=True, **kwargs)
 
         for field in self.model.fields:
             for validator in field.validators:
@@ -141,6 +140,6 @@ class AsyncManager(Manager):
                     if field.column_name == key:
                         validator(value)
 
-        new_instace_data = await self.db.fetchone(query, *values, commit=True)
+        new_instace_data = await self.db.fetchrow(query, *values)
 
         return self.model(**new_instace_data)
