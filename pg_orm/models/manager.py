@@ -4,7 +4,6 @@ from pg_orm.models.queryset import QuerySet
 
 class Manager:
     def __init__(self, model):
-        model.objects = self
         self.model = model
         self.db = getattr(model, "db", None)
 
@@ -91,37 +90,21 @@ class AsyncManager(Manager):
         """Returns a single row with the given values"""
         self.model(**kwargs)
         if id:
-            query = "SELECT * FROM {0} WHERE Id=$1;".format(self.model.table_name)
-            return self._return_model(await self.db.fetchrow(query, id))
-        else:
-            count = 1
-            params = []
-            for key in kwargs.keys():
-                params.append(f"{key}=${count}")
-                count += 1
-            query = "SELECT * FROM {0} WHERE {1};".format(
-                self.model.table_name, " AND ".join(params)
-            )
-            return self._return_model(
-                await self.db.fetchrow(query, *tuple(kwargs.values()))
-            )
+            kwargs["id"] = id
+        query, args = self.model._query_gen.generate_select_query(True, **kwargs)
+        return self._return_model(
+            await self.db.fetchrow(query, *tuple(kwargs.values()))
+        )
 
     async def filter(self, **kwargs):
         """Similar to get but returns multiple rows if exists"""
         self.model(**kwargs)
-        count = 1
-        params = []
-        for key in kwargs.keys():
-            params.append(f"{key}=${count}")
-            count += 1
-        query = "SELECT * FROM {0} WHERE {1};".format(
-            self.model.table_name, " AND ".join(params)
-        )
+        query, args = self.model._query_gen.generate_select_query(True, **kwargs)
         return QuerySet(
             self.model,
             [
                 self._return_model(row)
-                for row in await self.db.fetch(query, *tuple(kwargs.values()))
+                for row in await self.db.fetch(query, *args)
             ],
         )
 
