@@ -1,10 +1,4 @@
-import psycopg2
-
-from pg_orm import models
-from pg_orm.validators import LengthValidator
-from constants import POSTGRESQL_URI
-
-from models import SyncUsers as Users, SyncPost as Post # noqa
+from models import SyncUsers as Users, SyncPost as Post
 
 
 def test_table_creation():
