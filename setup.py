@@ -7,8 +7,8 @@ README = pathlib.Path(r"C:\Users\Rushda Niyas\Desktop\Rashaad\Programming\postgr
 # This call to setup() does all the work
 setuptools.setup(
     name="pg_orm",
-    version="0.5.1",
-    description="An ORM for PostgreSQL",
+    version="0.5.2",
+    description="An ORM for PostgreSQL written in python",
     long_description=README,
     packages=setuptools.find_packages(),
     long_description_content_type="text/markdown",
@@ -17,7 +17,7 @@ setuptools.setup(
     license="MIT",
     classifiers=[
         "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
     ],
     include_package_data=True,
     install_requires=["psycopg2", "asyncpg"],

@@ -1,35 +1,48 @@
-try:
-    import asyncpg
-except ImportError:
-    asyncpg = None
-try:
-    import psycopg2
-    from psycopg2 import pool
-except ImportError:
-    psycopg2 = None
-    pool = None
-
-import traceback
+from psycopg2 import pool
+import asyncpg
+from copy import deepcopy
 import typing as t
-import asyncio
+import pydoc
 import logging
 
+import pg_orm 
 from pg_orm.errors import FiledError
 from pg_orm.models.fields import Field, AutoIncrementIDField
 from pg_orm.models.manager import Manager, AsyncManager
+from pg_orm.models.query_generator import QueryGenerator
 from pg_orm.models.database import Psycopg2Driver, AsyncpgDriver
 
 
 log = logging.getLogger(__name__)
 
+def _delete_migration_files(cls, directory="migrations"):
+    from pathlib import Path
+    data_file = Path(f"{directory}\\{cls.__name__}.json")
+
+    if not data_file.exists():
+        raise RuntimeError("Could not find the appropriate data files.")
+
+    try:
+        data_file.unlink()
+    except:
+        raise RuntimeError("Could not delete current migration file")
+
 
 class ModelBase(type):
     def __new__(cls, name, bases, attrs, **kwargs):
+        table_name = (
+            attrs.pop("__tablename__", None)
+            or attrs.pop("table_name", None)
+            or kwargs.get("__tablename__", None)
+            or kwargs.get("table_name", None)
+        )
+        if table_name is None:
+            raise Exception("Table name not spcified.")
+        
         model_fields = []
-        table_name = attrs.get("__tablename__", name)
         new_attrs = dict()
 
-        if not attrs.get("id", None):
+        if attrs.get("id") is None:
             new_attrs["id"] = AutoIncrementIDField()
 
         for k, v in attrs.items():
@@ -39,12 +52,16 @@ class ModelBase(type):
             if isinstance(val, Field):
                 model_fields.append(val)
                 setattr(val, "column_name", key)
+            
+        if not model_fields:
+            raise Exception("Fields not specified")
 
         new_attrs["table_name"] = table_name
-        new_attrs["fields"] = model_fields
-        new_attrs["_valid_fields"] = [field.column_name for field in model_fields]
+        new_attrs["fields"] = tuple(model_fields)
+        new_attrs["_valid_fields"] = tuple(map(lambda field: field.column_name, model_fields))
 
         new_class = super().__new__(cls, name, bases, new_attrs)
+        new_class._query_gen = QueryGenerator(new_class)
 
         if new_class._is_sync:
             Manager(new_class)
@@ -54,8 +71,15 @@ class ModelBase(type):
         return new_class
 
 
-class Model(metaclass=ModelBase):
-    _is_sync = True
+class Model(metaclass=ModelBase, table_name="Model"):
+    """The base class for all models."""
+    db: t.Union[Psycopg2Driver, AsyncpgDriver]
+    fields: t.Tuple[Field]
+    table_name: str
+
+    @property
+    def _is_sync(self):
+        return True
 
     def __init__(self, **kwargs):
         self.attrs = kwargs
@@ -66,71 +90,69 @@ class Model(metaclass=ModelBase):
             else:
                 setattr(self, key, val)
 
-        if not psycopg2:
-            raise ModuleNotFoundError("Need to install psycopg2 for synchronous usage")
+    @classmethod
+    def set_db(cls, db):
+        cls.db = db
 
     @classmethod
-    def drop(cls):
-        """Drops the table"""
-        cls.db.execute(f"DROP TABLE {cls.table_name};")
+    def to_dict(cls):
+        data = dict()
+        data["name"] = cls.table_name
+        data["__meta__"] = cls.__module__ + "." + cls.__qualname__
+        data["fields"] = [f.to_dict() for f in cls.fields]
+        return data
 
     @classmethod
-    def create_table(cls, conn):
+    def from_dict(cls, data):
+        meta = data["__meta__"]
+        given = cls.__module__ + '.' + cls.__qualname__
+        if given != meta:
+            cls = pydoc.locate(meta)
+            if cls is None:
+                raise RuntimeError('Could not locate "%s"' % meta)
+
+        # self = deepcopy(cls)
+        self = cls()
+        self.table_name = data["name"]
+        self.fields = [Field.from_dict(a) for a in data["fields"]]
+        return self
+
+    @classmethod
+    def create_table(cls):
         """Creates the table for the model"""
         log.info(f"Creating table for Model '{cls.table_name}'")
-        columns = [f"{field.column_name} {field.to_sql()}" for field in cls.fields]
-        query = """
-                CREATE TABLE IF NOT EXISTS %s (
-                    %s
-                )""" % (
-            cls.table_name,
-            ",\n".join(columns),
-        )
 
-        with conn.cursor() as cursor:
-            cursor.execute(query)
-            conn.commit()
+        cls.db.execute(cls._query_gen.generate_table_creation_query())
+
+    @classmethod
+    def drop(cls, directory="migrations", delete_migration_files: bool = True):
+        """Drops the table and deletes the data files"""
+        if delete_migration_files:
+            _delete_migration_files(cls, directory)
+
+        cls.db.execute(f"DROP TABLE {cls.table_name} CASCADE;")
 
     def save(self, commit: bool = True):
-        """Saves the current model instace to the database"""
-        attrs = self.attrs
-        table_name = self.table_name
-        col_string = ", ".join(attrs.keys())
-        param_string = ", ".join("%s" for _ in range(len(attrs.keys())))
-        query = f"INSERT INTO {table_name} ({col_string}) VALUES({param_string})"
-
-        values = []
-        for v in attrs.values():
-            if isinstance(v, Model):
-                values.append(v.id)
-            else:
-                values.append(v)
+        """Saves the current model instance to the database"""
+        query, values = self._query_gen.generate_insert_query(**self.attrs)
 
         for field in self.fields:
-            for validator in field.data_validators:
-                for key, value in attrs.items():
+            for validator in field.validators:
+                for key, value in self.attrs.items():
                     if field.column_name == key:
                         validator(value)
 
-        self.db.execute(query, *tuple(values), commit=commit)
+        self.db.execute(query, *values, commit=commit)
 
     def delete(self, commit: bool = True):
         """Deletes the current model instance from the database"""
-        id = self.attrs.get("id", None)
-        query = f"DELETE FROM {self.table_name} WHERE Id=%s;"
+        query, id = self._query_gen.generate_row_deletion_query(**self.attrs)
         self.db.execute(query, id, commit=commit)
 
     def update(self, commit: bool = True):
         """Updates the model instace in the database with the current instance"""
-        attrs = self.attrs
-        id = attrs.get("id", None)
-        new_values = ", ".join([f"{k}=%s" for k in attrs.keys()])
-        query = f"UPDATE {self.table_name} SET {new_values} WHERE Id=%s"
-        self.db.execute(query, *tuple(attrs.values()), id, commit=commit)
-
-    @classmethod
-    def subclasses(cls):
-        return cls.__subclasses__()
+        query, args, id = self._query_gen.generate_update_query(**self.attrs)
+        self.db.execute(query, *args, id, commit=commit)
 
     def __repr__(self):
         return "<%s: %s>" % (
@@ -160,72 +182,37 @@ def create_model(
     cls=Model,
     adapter_cls=Psycopg2Driver,
 ):
-    cls.db = adapter_cls(pg_pool)
+    cls.set_db(adapter_cls(pg_pool))
 
     return cls
 
 
-class AsyncModel(Model, metaclass=ModelBase):
+class AsyncModel(Model, metaclass=ModelBase, table_name="AsyncModel"):
     """This is the model class which needs to be subclassed to use the async orm"""
 
-    _is_sync = False
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        if not asyncpg:
-            raise ModuleNotFoundError("Need to install asyncpg for asynchronous usage")
+    @property
+    def _is_sync(self):
+        return False
 
     @classmethod
-    async def create_table(cls, conn):
+    async def create_table(cls):
         """Creates the table for the model if it doesn't exist"""
         log.info(f"Creating table for Model '{cls.table_name}'")
-        columns = [f"{field.column_name} {field.to_sql()}" for field in cls.fields]
-        query = """
-                CREATE TABLE IF NOT EXISTS %s (
-                    %s
-                )""" % (
-            cls.table_name,
-            ",\n".join(columns),
-        )
-
-        await conn.execute(query)
+        await cls.db.execute(cls._query_gen.generate_table_creation_query())
 
     @classmethod
-    async def drop(cls):
-        """Drops the table for the model"""
-        await cls.db.execute(f"DROP TABLE {cls.table_name};")
+    async def drop(cls, directory="migrations", delete_migration_files: bool=True):
+        """Drops the table and deletes the data files"""
+        if delete_migration_files:
+            _delete_migration_files(cls, directory)
+
+        await cls.db.execute(f"DROP TABLE {cls.table_name} CASCADE;")
 
     async def save(self, commit: bool = True):
         """Saves the current model instance"""
-        attrs = self.attrs
-        col_string = ", ".join(attrs.keys())
-        params = []
-        count = 1
-        for _ in range(len(attrs.keys())):
-            params.append(f"${count}")
-            count += 1
-        param_string = ", ".join(params)
+        query, values = self._query_gen.generate_insert_query()
 
-        values = []
-        for v in attrs.values():
-            if isinstance(v, (AsyncModel, Model)):
-                values.append(v.id)
-            else:
-                values.append(v)
-
-        for field in self.fields:
-            for validator in field.data_validators:
-                for key, value in attrs.items():
-                    if field.column_name == key:
-                        if asyncio.iscoroutinefunction(validator):
-                            await validator(value)
-                        else:
-                            validator(value)
-
-        query = f"INSERT INTO {self.table_name} ({col_string}) VALUES({param_string})"
-
-        await self.db.execute(query, *tuple(values))
+        await self.db.execute(query, *values)
 
     async def delete(self):
         """Deletes the current model instance"""
@@ -235,17 +222,9 @@ class AsyncModel(Model, metaclass=ModelBase):
 
     async def update(self):
         """Updates the model instace in the database with the current instance"""
-        attrs = self.attrs.copy()
-        id = attrs.pop("id", None)
-        count = 1
-        new_values = []
-        for key in attrs.keys():
-            new_values.append(f"{key}=${count}")
-            count += 1
-        new_values = ", ".join(new_values)
-        query = f"UPDATE {self.table_name} SET {new_values} WHERE Id=${count}"
-        await self.db.execute(query, *tuple(attrs.values()), id)
+        query, args, id = self._query_gen.generate_update_query(**self.attrs)
+        await self.db.execute(query, *args, id)
 
 
-def create_async_model(pg_pool: asyncpg.Pool):
-    return create_model(pg_pool, cls=AsyncModel, adapter_cls=AsyncpgDriver)
+def create_async_model(pool: asyncpg.Pool):
+    return create_model(pool, AsyncModel, AsyncpgDriver)

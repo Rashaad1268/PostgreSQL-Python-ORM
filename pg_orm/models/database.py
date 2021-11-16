@@ -1,13 +1,6 @@
-try:
-    import psycopg2
-    from psycopg2 import pool
-except ImportError:
-    psycopg2 = None
-    pool = None
-try:
-    import asyncpg
-except ImportError:
-    asyncpg = None
+import psycopg2
+from psycopg2 import pool
+import asyncpg
 
 
 class Psycopg2Driver:
@@ -23,7 +16,7 @@ class Psycopg2Driver:
                 self.pool.putconn(conn)
 
     def fetchall(self, query, *args):
-        query_set = [{}]
+        query_set = []
         with self.pool.getconn() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(query, args)
@@ -36,27 +29,17 @@ class Psycopg2Driver:
 
         return query_set
 
-    def fetchone(self, query, *args):
+    def fetchone(self, query, *args, commit=False):
         query_set = {}
         with self.pool.getconn() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(query, args)
+                if commit:
+                    conn.commit()
                 result = cursor.fetchone()
                 if result:
                     column_names = [desc[0] for desc in cursor.description]
-                    query_set = dict(zip(column_names, result)) or {}
-                self.pool.putconn(conn)
-
-        return query_set
-
-    def fetchval(self, query, *args):
-        with self.pool.getconn() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(query, args)
-                result = cursor.fetchone()
-                conn.commit()
-                column_names = [desc[0] for desc in cursor.description]
-                query_set = dict(zip(column_names, result)) or {}
+                    query_set = dict(zip(column_names, result))
                 self.pool.putconn(conn)
 
         return query_set

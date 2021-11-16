@@ -1,27 +1,15 @@
 import psycopg2
 
 from pg_orm import models
+from pg_orm.validators import LengthValidator
 from constants import POSTGRESQL_URI
 
-pool = psycopg2.pool.SimpleConnectionPool(1, 10, POSTGRESQL_URI)
-Model = models.create_model(pool)
-
-
-class Users(Model):
-    name = models.CharField(50)
-
-
-class Post(Model):
-    name = models.CharField(50)
-    body = models.TextField()
-    author = models.ForeignKey(Users, on_delete=models.CASCADE)
+from models import SyncUsers as Users, SyncPost as Post # noqa
 
 
 def test_table_creation():
-    with pool.getconn() as conn:
-        Users.create_table(conn)
-        Post.create_table(conn)
-        pool.putconn(conn)
+    Users.create_table()
+    Post.create_table()
 
 
 def test_model_save():
@@ -53,7 +41,7 @@ def test_model_filter():
     users = Users.objects.filter(name="Test user created")
     assert users.count() == 5
     for user in users:
-        user.name == "Test user created"
+        assert user.name == "Test user created"
 
 
 def test_model_all():
@@ -100,8 +88,8 @@ def test_model_comparison():
     assert post2 == post2
     assert post1 != post2
 
-    user1 = Post.objects.get(1)
-    user2 = Post.objects.get(3)
+    user1 = Users.objects.get(1)
+    user2 = Users.objects.get(3)
 
     assert user1 == user1
     assert user2 == user2
@@ -118,7 +106,7 @@ def test_model_hash():
 
 def test_model_create():
     post = Post.objects.create(
-        name="Test post created by Model.objects.create", body="test post create"
+        name="Test post created by Model.objects.create", body="test post create", author=1
     )
     assert (
         post.name == "Test post created by Model.objects.create"
@@ -130,5 +118,5 @@ def test_model_create():
 
 
 def test_model_drop():
-    Post.drop()
-    Users.drop()
+    Post.drop(delete_migration_files=False)
+    Users.drop(delete_migration_files=False)

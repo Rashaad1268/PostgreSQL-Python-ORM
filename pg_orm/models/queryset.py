@@ -1,4 +1,5 @@
 class QuerySet(list):
+    """Subclass of list"""
     def __init__(self, model, query_set):
         self.model = model
         super().__init__(query_set)
@@ -20,6 +21,7 @@ class QuerySet(list):
 
     @property
     def raw(self):
+        """For backwards compatibility"""
         return self
 
     def __repr__(self):
