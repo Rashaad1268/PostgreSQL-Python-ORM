@@ -1,44 +1,31 @@
 from psycopg2 import pool
 import asyncpg
-from copy import deepcopy
 import typing as t
 import pydoc
+from pathlib import Path
 import logging
+import os
 
-import pg_orm 
 from pg_orm.errors import FiledError
 from pg_orm.models.fields import Field, AutoIncrementIDField
 from pg_orm.models.manager import Manager, AsyncManager
 from pg_orm.models.query_generator import QueryGenerator
 from pg_orm.models.database import Psycopg2Driver, AsyncpgDriver
 
-
 log = logging.getLogger(__name__)
-
-def _delete_migration_files(cls, directory="migrations"):
-    from pathlib import Path
-    data_file = Path(f"{directory}\\{cls.__name__}.json")
-
-    if not data_file.exists():
-        raise RuntimeError("Could not find the appropriate data files.")
-
-    try:
-        data_file.unlink()
-    except:
-        raise RuntimeError("Could not delete current migration file")
 
 
 class ModelBase(type):
     def __new__(cls, name, bases, attrs, **kwargs):
         table_name = (
-            attrs.pop("__tablename__", None)
-            or attrs.pop("table_name", None)
-            or kwargs.get("__tablename__", None)
-            or kwargs.get("table_name", None)
+                attrs.pop("__tablename__", None)
+                or attrs.pop("table_name", None)
+                or kwargs.get("__tablename__", None)
+                or kwargs.get("table_name", None)
         )
         if table_name is None:
             raise Exception("Table name not spcified.")
-        
+
         model_fields = []
         new_attrs = dict()
 
@@ -52,37 +39,37 @@ class ModelBase(type):
             if isinstance(val, Field):
                 model_fields.append(val)
                 setattr(val, "column_name", key)
-            
+
         if not model_fields:
             raise Exception("Fields not specified")
 
         new_attrs["table_name"] = table_name
         new_attrs["fields"] = tuple(model_fields)
-        new_attrs["_valid_fields"] = tuple(map(lambda field: field.column_name, model_fields))
+        new_attrs["_valid_fields"] = tuple(field.column_name for field in model_fields)
 
         new_class = super().__new__(cls, name, bases, new_attrs)
         new_class._query_gen = QueryGenerator(new_class)
 
-        if new_class._is_sync:
-            Manager(new_class)
-        elif not new_class._is_sync:
-            AsyncManager(new_class)
+        model_is_sync = getattr(new_class, "_is_sync", True)
+
+        if model_is_sync:
+            new_class.objects = Manager(new_class)
+        elif not model_is_sync:
+            new_class.objects = AsyncManager(new_class)
 
         return new_class
 
 
 class Model(metaclass=ModelBase, table_name="Model"):
     """The base class for all models."""
-    db: t.Union[Psycopg2Driver, AsyncpgDriver]
+    db: t.Union[Psycopg2Driver, AsyncpgDriver, None]
     fields: t.Tuple[Field]
     table_name: str
-
-    @property
-    def _is_sync(self):
-        return True
+    _valid_fields: t.Iterable
 
     def __init__(self, **kwargs):
         self.attrs = kwargs
+        print(self.fields)
 
         for key, val in kwargs.items():
             if key not in self._valid_fields:
@@ -98,29 +85,28 @@ class Model(metaclass=ModelBase, table_name="Model"):
     def to_dict(cls):
         data = dict()
         data["name"] = cls.table_name
-        data["__meta__"] = cls.__module__ + "." + cls.__qualname__
+        data["path"] = cls.__module__ + "." + cls.__qualname__
         data["fields"] = [f.to_dict() for f in cls.fields]
         return data
 
     @classmethod
     def from_dict(cls, data):
-        meta = data["__meta__"]
+        path = data["path"]
         given = cls.__module__ + '.' + cls.__qualname__
-        if given != meta:
-            cls = pydoc.locate(meta)
+        if given != path:
+            cls = pydoc.locate(path)
             if cls is None:
-                raise RuntimeError('Could not locate "%s"' % meta)
+                raise RuntimeError('Could not locate "%s"' % path)
 
-        # self = deepcopy(cls)
         self = cls()
         self.table_name = data["name"]
-        self.fields = [Field.from_dict(a) for a in data["fields"]]
+        self.fields = tuple(Field.from_dict(a) for a in data["fields"])
         return self
 
     @classmethod
     def create_table(cls):
         """Creates the table for the model"""
-        log.info(f"Creating table for Model '{cls.table_name}'")
+        log.info(f"Creating table '{cls.table_name}'")
 
         cls.db.execute(cls._query_gen.generate_table_creation_query())
 
@@ -128,17 +114,29 @@ class Model(metaclass=ModelBase, table_name="Model"):
     def drop(cls, directory="migrations", delete_migration_files: bool = True):
         """Drops the table and deletes the data files"""
         if delete_migration_files:
-            _delete_migration_files(cls, directory)
+            cls._delete_migration_files(directory)
 
         cls.db.execute(f"DROP TABLE {cls.table_name} CASCADE;")
+
+    @classmethod
+    def _delete_migration_files(cls, directory="migrations"):
+        data_file = Path(os.path.join(directory, f"{cls.__name__}.json"))
+
+        if not data_file.exists():
+            raise RuntimeError("Could not find the appropriate migrations files.")
+
+        try:
+            data_file.unlink()
+        except Exception:
+            raise RuntimeError("Could not delete migration files.")
 
     def save(self, commit: bool = True):
         """Saves the current model instance to the database"""
         query, values = self._query_gen.generate_insert_query(**self.attrs)
 
         for field in self.fields:
-            for validator in field.validators:
-                for key, value in self.attrs.items():
+            for key, value in self.attrs.items():
+                for validator in field.validators:
                     if field.column_name == key:
                         validator(value)
 
@@ -156,12 +154,12 @@ class Model(metaclass=ModelBase, table_name="Model"):
 
     def __repr__(self):
         return "<%s: %s>" % (
-            self.__class__.__name__,
-            ", ".join([f"{k}={v!r}" for k, v in self.attrs.items()]),
+            type(self).__name__,
+            ", ".join(f"{k}={v!r}" for k, v in self.attrs.items()),
         )
 
     def __hash__(self):
-        return hash(self.id)
+        return hash(self.attrs.get("id"))
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.id == other.id
@@ -178,9 +176,9 @@ class Model(metaclass=ModelBase, table_name="Model"):
 
 
 def create_model(
-    pg_pool: t.Union[pool.AbstractConnectionPool, asyncpg.Pool],
-    cls=Model,
-    adapter_cls=Psycopg2Driver,
+        pg_pool: t.Union[pool.AbstractConnectionPool, asyncpg.Pool],
+        cls=Model,
+        adapter_cls=Psycopg2Driver,
 ):
     cls.set_db(adapter_cls(pg_pool))
 
@@ -201,10 +199,10 @@ class AsyncModel(Model, metaclass=ModelBase, table_name="AsyncModel"):
         await cls.db.execute(cls._query_gen.generate_table_creation_query())
 
     @classmethod
-    async def drop(cls, directory="migrations", delete_migration_files: bool=True):
+    async def drop(cls, directory="migrations", delete_migration_files: bool = True):
         """Drops the table and deletes the data files"""
         if delete_migration_files:
-            _delete_migration_files(cls, directory)
+            cls._delete_migration_files(directory)
 
         await cls.db.execute(f"DROP TABLE {cls.table_name} CASCADE;")
 
