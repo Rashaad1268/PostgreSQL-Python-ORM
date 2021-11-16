@@ -19,5 +19,7 @@ migrate(Post)
 pg_pool.closeall() # Close the pool at last
 ```
 
-Congratulations you have created a Model, as simple as that  
-Refer to `rows.md` if you want to know about handling rows
+Check [`migrations.md`](https://github.com/Rashaad1268/PostgreSQL-Python-ORM/blob/main/examples/migrations.md)
+on applying the migrations
+and [`rows.md`](https://github.com/Rashaad1268/PostgreSQL-Python-ORM/blob/main/examples/rows.md)
+on querying the database
