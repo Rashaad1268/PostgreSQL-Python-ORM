@@ -69,7 +69,7 @@ class Model(metaclass=ModelBase, table_name="Model"):
     @classmethod
     @property
     def _is_sync(cls):
-        return False
+        return True
 
     def __init__(self, **kwargs):
         self.attrs = kwargs
@@ -193,7 +193,7 @@ class AsyncModel(Model, metaclass=ModelBase, table_name="AsyncModel"):
 
     @classmethod
     @property
-    def _is_sync(self):
+    def _is_sync(cls):
         return False
 
     @classmethod
