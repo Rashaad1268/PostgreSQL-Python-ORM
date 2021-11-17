@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import psycopg2
 import asyncpg
-from typing import Union
+from typing import Union, Type
 
 from pg_orm.models.base_model import Model, AsyncModel
 from pg_orm.migrations.schema_diff import SchemaDifference
@@ -14,11 +14,11 @@ log = logging.getLogger(__name__)
 loop = asyncio.get_event_loop()
 
 
-def _get_data_file(cls: Union[Model, AsyncModel], directory):
+def _get_data_file(cls: Union[Type[Model], Type[AsyncModel]], directory):
     return Path(f"{directory}\\{cls.__name__}.json")
 
 
-def _write_migrations(cls: Union[Model, AsyncModel], directory="migrations"):
+def _write_migrations(cls: Union[Type[Model], Type[AsyncModel]], directory="migrations"):
     """Writes the data to the data files, creates it if not exists
        WARNING: Do not manually call this function unless you know what you are doing use migrate instead"""
     data_file = _get_data_file(cls, directory)
@@ -35,7 +35,7 @@ def _write_migrations(cls: Union[Model, AsyncModel], directory="migrations"):
             json.dump(table_data, fp, indent=4, ensure_ascii=True)
 
 
-def migrate(cls: Model, directory="migrations", print_query: bool = False):
+def migrate(cls: Type[Model], directory="migrations", print_query: bool = False):
     data_file = _get_data_file(cls, directory)
 
     if not data_file.exists():
@@ -70,7 +70,7 @@ def migrate_all(directory="migrations", print_query: bool = False):
         migrate(model, directory, print_query)
 
 
-async def async_migrate(cls: AsyncModel, directory="migrations", print_query: bool = False):
+async def async_migrate(cls: Type[AsyncModel], directory="migrations", print_query: bool = False):
     data_file = _get_data_file(cls, directory)
 
     if not data_file.exists():
