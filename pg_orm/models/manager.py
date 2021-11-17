@@ -14,11 +14,9 @@ class Manager:
             self.model, [self._return_model(row) for row in self.db.fetchall(query)]
         )
 
-    def get(self, id=None, **kwargs):
+    def get(self, **kwargs):
         """Returns a single row with the given values"""
         self.model(**kwargs)
-        if id is not None:
-            kwargs["id"] = id
         query, args = self.model._query_gen.generate_select_query(**kwargs)
         return self._return_model(self.db.fetchone(query, *args))
 
@@ -67,9 +65,9 @@ class Manager:
                     if field.column_name == key:
                         validator(value)
 
-        new_instace_data = self.db.fetchone(query, *values, commit=True)
+        new_instance_data = self.db.fetchone(query, *values, commit=True)
 
-        return self.model(**new_instace_data)
+        return self.model(**new_instance_data)
 
     def _return_model(self, query_set: dict):
         if bool(query_set):
@@ -86,11 +84,9 @@ class AsyncManager(Manager):
             self.model, [self._return_model(row) for row in await self.db.fetch(query)]
         )
 
-    async def get(self, id=None, **kwargs):
+    async def get(self, **kwargs):
         """Returns a single row with the given values"""
         self.model(**kwargs)
-        if id:
-            kwargs["id"] = id
         query, args = self.model._query_gen.generate_select_query(True, **kwargs)
         return self._return_model(
             await self.db.fetchrow(query, *args)
