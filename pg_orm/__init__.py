@@ -1,8 +1,5 @@
 import logging
 
-from pg_orm.migrations.migration import (migrate, migrate_all,
-                                         async_migrate, async_migrate_all)
-
 
 def init_db(psycopg2_pool=None, asyncpg_pool=None):
     from pg_orm.models.base_model import Model, AsyncModel
