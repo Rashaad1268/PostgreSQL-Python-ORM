@@ -1,12 +1,10 @@
-from psycopg2 import pool
-import asyncpg
 import typing as t
 import pydoc
 from pathlib import Path
 import logging
 import os
 
-from pg_orm.errors import FiledError
+from pg_orm.errors import FiledError, DataBaseNotConfigured
 from pg_orm.models.fields import Field, AutoIncrementIDField
 from pg_orm.models.manager import Manager, AsyncManager
 from pg_orm.models.query_generator import QueryGenerator
@@ -61,7 +59,7 @@ class ModelBase(type):
 
 class Model(metaclass=ModelBase, table_name="Model"):
     """The base class for all models."""
-    db: t.Union[Psycopg2Driver, AsyncpgDriver, None]
+    db: t.Union[Psycopg2Driver, AsyncpgDriver, None] = None
     fields: t.Tuple[Field]
     table_name: str
     _valid_fields: t.Iterable
@@ -72,6 +70,9 @@ class Model(metaclass=ModelBase, table_name="Model"):
         return True
 
     def __init__(self, **kwargs):
+        if self.db is None:
+            raise DataBaseNotConfigured("pg_orm.init_db")
+
         self.attrs = kwargs
 
         for key, val in kwargs.items():
@@ -178,16 +179,6 @@ class Model(metaclass=ModelBase, table_name="Model"):
         return not self.__eq__(other)
 
 
-def create_model(
-        pg_pool: t.Union[pool.AbstractConnectionPool, asyncpg.Pool],
-        cls=Model,
-        adapter_cls=Psycopg2Driver,
-):
-    cls.set_db(adapter_cls(pg_pool))
-
-    return cls
-
-
 class AsyncModel(Model, metaclass=ModelBase, table_name="AsyncModel"):
     """This is the model class which needs to be subclassed to use the async orm"""
 
@@ -224,7 +215,3 @@ class AsyncModel(Model, metaclass=ModelBase, table_name="AsyncModel"):
         """Updates the model instace in the database with the current instance"""
         query, args, id = self._query_gen.generate_update_query(True, **self.attrs)
         await self.db.execute(query, *args, id)
-
-
-def create_async_model(pool: asyncpg.Pool):
-    return create_model(pool, AsyncModel, AsyncpgDriver)
