@@ -2,7 +2,7 @@ import setuptools
 import pathlib
 
 # The text of the README file
-README = pathlib.Path(r"C:\Users\Rushda Niyas\Desktop\Rashaad\Programming\postgres_orm\Readme.md").read_text()
+README = pathlib.Path("./Readme.md").read_text()
 
 # This call to setup() does all the work
 setuptools.setup(
