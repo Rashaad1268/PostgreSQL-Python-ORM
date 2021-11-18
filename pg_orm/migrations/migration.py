@@ -67,7 +67,8 @@ def migrate(cls: Type[Model], directory="migrations", print_query: bool = False)
 
 def migrate_all(directory="migrations", print_query: bool = False):
     for model in Model.__subclasses__():
-        migrate(model, directory, print_query)
+        if model._is_sync:
+            migrate(model, directory, print_query)
 
 
 async def async_migrate(cls: Type[AsyncModel], directory="migrations", print_query: bool = False):
