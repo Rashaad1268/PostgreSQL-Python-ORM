@@ -52,27 +52,23 @@ class AsyncpgDriver:
     async def execute(self, query, *args):
         async with self.pool.acquire() as conn:
             result = await conn.execute(query, *args)
-            await self.pool.release(conn)
 
         return result
 
     async def fetch(self, query, *args):
         async with self.pool.acquire() as conn:
             result = await conn.fetch(query, *args)
-            await self.pool.release(conn)
 
         return result
 
     async def fetchrow(self, query, *args):
         async with self.pool.acquire() as conn:
             record = await conn.fetchrow(query, *args)
-            await self.pool.release(conn)
 
         return record
 
     async def fetchval(self, query, *args):
         async with self.pool.acquire() as conn:
             result = await conn.fetchval(query, *args)
-            await self.pool.release(conn)
 
         return result
