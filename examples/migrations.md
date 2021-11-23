@@ -6,6 +6,8 @@ Applying the migrations will apply any changes in your code to the database.
 
 > It is recommended to create a new file named `migrations.py`
 
+*Don't forget to call `pg_orm.init_db` and initialize the pool*
+
 If you are using `pg_orm.models.Model`
 
 ```python
