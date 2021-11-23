@@ -1,7 +1,7 @@
 import logging
 
 
-def init_db(psycopg2_pool=None, asyncpg_pool=None):
+def init_db(*, psycopg2_pool=None, asyncpg_pool=None):
     from pg_orm.models.base_model import Model, AsyncModel
     from pg_orm.models.database import Psycopg2Driver, AsyncpgDriver
 
