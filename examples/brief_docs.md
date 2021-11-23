@@ -4,6 +4,10 @@ This documentation will get replaced by actual documentation
 
 ----
 
+## `pg_orm.init_db(*, psycopg2_pool=None, asyncpg_pool=None)`
+
+Used to configure the pool for the library to use
+
 ## `class pg_orm.models.Model`
 
 The base class of models

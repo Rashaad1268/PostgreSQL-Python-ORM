@@ -1,20 +1,22 @@
 ```python
 # models.py file
-from pg_orm import models, migrate
+import pg_orm
+from pg_orm import models, migrations
 from psycopg2 import pool
 
-uri = "postgresql://user:password_1234@127.0.0.1:5432/postgres"
-pg_pool = pool.SimpleConnectionPool(1, 10, uri)
-Model = models.create_model(pg_pool)
+URI = "postgresql://user:password_1234@127.0.0.1:5432/postgres"
+pg_pool = pool.SimpleConnectionPool(1, 10, URI)
+pg_orm.init_db(psycopg2_pool=pg_pool)
 
-class Post(Model):
+class Post(models.Model, table_name="Post"):
     # We are making a post model
     # An id field will be automatically set by the library
+    # If one is not already set
     title = models.CharField(max_length=255)
     body = models.TextField()
     date_created = models.DateTimeField(auto_now_add=True) # Now the date_created will be automatically set
 
-migrate(Post)
+migrations.migrate_all()
 
 pg_pool.closeall() # Close the pool at last
 ```
