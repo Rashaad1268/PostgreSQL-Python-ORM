@@ -1,25 +1,25 @@
 import datetime
-import asyncio
 import pydoc
 from typing import Iterable, Any, Callable, Optional
 
-from pg_orm.models.utils import quote
 from pg_orm.errors import SchemaError
 from pg_orm.models import base_model
 from pg_orm.models.utils import maybe_await
+from pg_orm.models.utils import quote
 
 
 class Field:
     python = None  # The field data type in python
+    postgresql = None  # The value will be set in the subclasses
 
     def __init__(
-        self,
-        null: bool = False,
-        unique: bool = False,
-        primary_key: bool = None,
-        default: Any = None,
-        default_sql_value: Any = None,
-        validators: Optional[Iterable[Callable[[Any], Any]]] = None,
+            self,
+            null: bool = False,
+            unique: bool = False,
+            primary_key: bool = None,
+            default: Any = None,
+            default_sql_value: Any = None,
+            validators: Optional[Iterable[Callable[[Any], Any]]] = None,
     ):
         self.column_name = None  # This will be replaced later
         self.validators = validators
@@ -54,6 +54,45 @@ class Field:
         self.__dict__.update(data)
         return self
 
+    def to_sql(self):
+        if self.postgresql is None:
+            raise NotImplementedError()
+        return f"{self.postgresql}{self._get_pk_val()}{self._get_unique_val()}"\
+                f"{self._get_null_val()}{self._get_default_sql_val()}"
+
+    def _get_default_python_val(self):
+        if callable(self.default):
+            return maybe_await(self.default)
+        else:
+            return self.default
+
+    def _get_default_sql_val(self):
+        if self.default_sql_value:
+            if callable(self.default_sql_value):
+                return f" DEFAULT {quote(maybe_await(self.default_sql_value))}"
+            else:
+                return f" DEFAULT {quote(self.default_sql_value)}"
+        else:
+            return ""
+
+    def _get_null_val(self):
+        if self.nullable:
+            return ""
+        elif not self.nullable:
+            return " NOT NULL"
+
+    def _get_pk_val(self):
+        if self.primary_key:
+            return " PRIMARY KEY"
+        else:
+            return ""
+
+    def _get_unique_val(self):
+        if self.is_unique:
+            return " UNIQUE"
+        else:
+            return ""
+
     def __copy__(self):
         cls = self.__class__
         new = cls.__new__(cls)
@@ -70,39 +109,6 @@ class Field:
         path = "%s.%s" % (self.__class__.__module__, self.__class__.__qualname__)
         return "<%s>" % path
 
-    def to_sql(self):
-        raise NotImplementedError()
-
-    def _get_default_python_val(self):
-        if callable(self.default):
-            return asyncio.run(maybe_await(self.default))
-        else:
-            return self.default
-
-    def _get_default_sql_val(self):
-        if callable(self.default_sql_value):
-            return quote(asyncio.run(maybe_await(self.default_sql_value)))
-        else:
-            return quote(self.default_sql_value)
-
-    def _get_null_val(self):
-        if self.nullable:
-            return " NULL"
-        elif not self.nullable:
-            return " NOT NULL"
-
-    def _get_pk_val(self):
-        if self.primary_key:
-            return " PRIMARY KEY"
-        else:
-            return ""
-
-    def _get_unique_val(self):
-        if self.is_unique:
-            return " UNIQUE"
-        else:
-            return ""
-
 
 class IntegerField(Field):
     """Field to store integers"""
@@ -110,11 +116,11 @@ class IntegerField(Field):
     python = int
 
     def __init__(
-        self,
-        small_int: bool = False,
-        big_int: bool = False,
-        auto_increment: bool = False,
-        **kwargs,
+            self,
+            small_int: bool = False,
+            big_int: bool = False,
+            auto_increment: bool = False,
+            **kwargs,
     ):
         self.small_int = small_int
         self.big_int = big_int
@@ -127,21 +133,20 @@ class IntegerField(Field):
         if auto_increment:
             self.python = None
 
-    def to_sql(self):
-        pg_type = "INTEGER"
+        postgresql = "INTEGER"
         if self.auto_increment:
             if self.big_int:
-                pg_type = "BIGSERIAL"
+                postgresql = "BIGSERIAL"
             elif self.small_int:
-                pg_type = "SMALLSERIAL"
+                postgresql = "SMALLSERIAL"
             else:
-                pg_type = "SERIAL"
+                postgresql = "SERIAL"
         elif self.big_int:
-            pg_type = "BIGINT"
+            postgresql = "BIGINT"
         elif self.small_int:
-            pg_type = "SMALLINT"
+            postgresql = "SMALLINT"
 
-        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}"
+        self.postgresql = postgresql
 
 
 class AutoIncrementIntegerField(IntegerField):
@@ -164,26 +169,18 @@ class CharField(Field):
     def __init__(self, max_length: int = None, **kwargs):
         self.max_length = max_length
         super().__init__(**kwargs)
-
-    def to_sql(self):
-        pg_type = f"VARCHAR({self.max_length})" if self.max_length is not None else "TEXT"
-        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}"
+        self.postgresql = f"VARCHAR({self.max_length})" if self.max_length is not None else "TEXT"
 
 
 class FloatField(IntegerField):
     """A field for boolean values"""
 
     python = float
-
-    def to_sql(self):  
-        pg_type = "REAL"
-        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}"
+    postgresql = "REAL"
 
 
 class TextField(CharField):
     """A field for large string based values"""
-
-    python = str
 
     def __init__(self, max_length=None, **kwargs):
         kwargs["max_length"] = max_length
@@ -198,30 +195,24 @@ class DateTimeField(Field):
     def __init__(self, has_timezone=False, **kwargs):
         self.has_timezone = has_timezone
         super().__init__(**kwargs)
-
-    def to_sql(self):
-        pg_type = "TIMESTAMP WITH TIME ZONE" if self.has_timezone is not None else "TIMESTAMP"
-        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}"
+        self.postgresql = "TIMESTAMP WITH TIME ZONE" if self.has_timezone is not None else "TIMESTAMP"
 
 
 class BooleanField(Field):
     """A field to store boolean values"""
 
     python = bool
-
-    def to_sql(self):
-        pg_type = "BOOL"
-        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}"
+    postgresql = "BOOL"
 
 
 class ForeignKey(Field):
     def __init__(
-        self,
-        to,
-        on_delete: str,
-        sql_type: str,
-        column: str = "Id",
-        **kwargs,
+            self,
+            to,
+            on_delete: str,
+            sql_type: str,
+            column: str = "Id",
+            **kwargs,
     ):
         options = (
             "NO ACTION",
@@ -235,7 +226,7 @@ class ForeignKey(Field):
 
         super().__init__(**kwargs)
 
-        if isinstance(to, base_model.ModelBase):
+        if isinstance(to, base_model.BaseModel):
             self.to = to.table_name
 
         elif isinstance(to, str):
@@ -248,28 +239,17 @@ class ForeignKey(Field):
 
         self.sql_type = sql_type
         self.on_delete = on_delete.upper()
-
-    def to_sql(self):
-        sql = "{0.sql_type} REFERENCES {0.to}({0.column}) ON DELETE {0.on_delete}"
-        return sql.format(self)
-
-    def is_real_type(self):
-        return False
+        self.postgresql = "{0.sql_type} REFERENCES {0.to}({0.column}) ON DELETE {0.on_delete}".format(self)
 
 
 class JsonField(Field):
     python = dict
-
-    def to_sql(self):
-        return f"JSON{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}"
+    postgresql = "JSON"
 
 
 class BinaryField(Field):
     python = bytes
-
-    def to_sql(self):
-
-        return f"BYTEA{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}"
+    postgresql = "BYTEA"
 
 
 class ArrayField(Field):
@@ -278,15 +258,15 @@ class ArrayField(Field):
     def __init__(self, sql_type: str, **kwargs):
         self.sql_type = sql_type
         super().__init__(**kwargs)
-    
-    def to_sql(self):
-        return "{0.sql_type} ARRAY".format(self)
+        self.postgresql = f"{self.sql_type} ARRAY"
+
 
 class DateField(Field):
     python = datetime.date
 
     def __init__(self):
         raise NotImplementedError
+
 
 class TimeDeltaField(Field):
     python = datetime.timedelta
