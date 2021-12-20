@@ -73,11 +73,9 @@ class BaseModel:
         if super().__getattribute__("db") is None:
             raise DataBaseNotConfigured()
 
-        for key, val in kwargs.items():
+        for key in kwargs:
             if key not in self.fields:
                 raise FiledError(key, self.fields.keys())
-            else:
-                setattr(self, key, val)
 
     @classmethod
     def set_db(cls, db):
@@ -171,7 +169,7 @@ class Model(BaseModel, metaclass=ModelMeta):
         """Saves the current model instance to the database"""
         for key, value in self.attrs.items():
             for validator in self.fields[key].validators:
-                validator(value)
+                maybe_await(validator(value))
 
         all_fields = set(self.fields)
         all_fields.discard("id")
@@ -218,15 +216,21 @@ class AsyncModel(BaseModel, metaclass=ModelMeta):
 
         await cls.db.execute(f"DROP TABLE {cls.table_name} CASCADE;")
 
-    async def save(self, commit: bool = True):
+    async def save(self):
         """Saves the current model instance"""
-        query, values = self._query_gen.generate_insert_query(asyncpg=True, **self.attrs)
+        for key, value in self.attrs.items():
+            for validator in self.fields[key].validators:
+                maybe_await(validator(value))
 
-        for field in self.fields.values():
-            for key, value in self.attrs.items():
-                for validator in field.validators:
-                    if field.column_name == key:
-                        await maybe_await(validator, value)
+        all_fields = set(self.fields)
+        all_fields.discard("id")
+        unspecified_fields = set(all_fields) - set(self.attrs)
+        for field_name in unspecified_fields:
+            field = self.fields[field_name]
+            if field.default is not None:
+                self.attrs[field_name] = field._get_default_python_val()
+
+        query, values = self._query_gen.generate_insert_query(asyncpg=True, **self.attrs)
 
         await self.db.execute(query, *values)
 
