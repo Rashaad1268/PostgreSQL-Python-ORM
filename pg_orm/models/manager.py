@@ -1,5 +1,6 @@
 from pg_orm import models
 from pg_orm.models.queryset import QuerySet
+from pg_orm.models.utils import maybe_await
 
 
 class Manager:
@@ -58,14 +59,20 @@ class Manager:
         Creates and returns new model instance with the given values and saves it in the database
         """
         self.model(**kwargs)
+
+        for key, value in kwargs.items():
+            for validator in self.model.fields[key].validators:
+                maybe_await(validator(value))
+
+        all_fields = set(self.model.fields)
+        all_fields.discard("id")
+        unspecified_fields = set(all_fields) - set(kwargs)
+        for field_name in unspecified_fields:
+            field = self.model.fields[field_name]
+            if field.default is not None:
+                kwargs[field_name] = field._get_default_python_val()
+
         query, values = self.model._query_gen.generate_insert_query(True, **kwargs)
-
-        for field in self.model.fields.values():
-            for validator in field.validators:
-                for key, value in kwargs.items():
-                    if field.column_name == key:
-                        validator(value)
-
         new_instance_data = self.db.fetchone(query, *values, commit=True)
 
         return self.model(**new_instance_data)
@@ -129,14 +136,20 @@ class AsyncManager(Manager):
         Creates and returns new model instance with the given values and saves it in the database
         """
         self.model(**kwargs)
+
+        for key, value in kwargs.items():
+            for validator in self.model.fields[key].validators:
+                maybe_await(validator(value))
+
+        all_fields = set(self.model.fields)
+        all_fields.discard("id")
+        unspecified_fields = set(all_fields) - set(kwargs)
+        for field_name in unspecified_fields:
+            field = self.model.fields[field_name]
+            if field.default is not None:
+                kwargs[field_name] = field._get_default_python_val()
+
         query, values = self.model._query_gen.generate_insert_query(True, asyncpg=True, **kwargs)
+        new_instance_data = await self.db.fetchrow(query, *values)
 
-        for field in self.model.fields:
-            for validator in field.validators:
-                for key, value in kwargs.items():
-                    if field.column_name == key:
-                        validator(value)
-
-        new_instace_data = await self.db.fetchrow(query, *values)
-
-        return self.model(**new_instace_data)
+        return self.model(**new_instance_data)
