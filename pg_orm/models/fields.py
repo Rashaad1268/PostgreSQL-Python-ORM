@@ -1,15 +1,12 @@
 import datetime
-import logging
-import inspect
+import asyncio
 import pydoc
-from typing import Optional, Any, Callable, Union
+from typing import Iterable, Any, Callable, Optional
 
-from pg_orm.validators import Validator
+from pg_orm.models.utils import quote
 from pg_orm.errors import SchemaError
 from pg_orm.models import base_model
-from pg_orm.models.utils import PythonToSQLConverter as PyToSQL
-
-log = logging.getLogger(__name__)
+from pg_orm.models.utils import maybe_await
 
 
 class Field:
@@ -19,29 +16,33 @@ class Field:
         self,
         null: bool = False,
         unique: bool = False,
-        default: Any = None,
         primary_key: bool = None,
-        default_insertion_value: Optional[Callable] = None,
-        validators: Union[list[Callable], tuple[Callable]] = [],
+        default: Any = None,
+        default_sql_value: Any = None,
+        validators: Optional[Iterable[Callable[[Any], Any]]] = None,
     ):
-        self.column_name = None # This will be replaced later
+        self.column_name = None  # This will be replaced later
         self.validators = validators
         self.is_unique = unique
         self.primary_key = primary_key
         self.nullable = null  # Fields aren't nullable by default
         self.default = default
-        self.default_insertion_value = default_insertion_value
+        self.default_sql_value = default_sql_value
+
+        if validators is None:
+            self.validators = []
 
     def to_dict(self):
         data = self.__dict__.copy()
+        data.pop("default", None)
         cls = self.__class__
-        data["__meta__"] = cls.__module__ + "." + cls.__qualname__
+        data["path"] = cls.__module__ + "." + cls.__qualname__
 
         return data
 
     @classmethod
     def from_dict(cls, data):
-        meta = data["__meta__"]
+        meta = data["path"]
         given = cls.__module__ + "." + cls.__qualname__
 
         if given != meta:
@@ -72,14 +73,17 @@ class Field:
     def to_sql(self):
         raise NotImplementedError()
 
-    def _get_default_val(self):
-        if self.default is not None:
-            de = self.default
-            if inspect.ismethod(de) or inspect.isfunction(de) or inspect.isbuiltin(de):
-                return f" DEFAULT {PyToSQL.convert(de())}"
-            else:
-                return f" DEFAULT {PyToSQL.convert(de)}"
-        return ""
+    def _get_default_python_val(self):
+        if callable(self.default):
+            return asyncio.run(maybe_await(self.default))
+        else:
+            return self.default
+
+    def _get_default_sql_val(self):
+        if callable(self.default_sql_value):
+            return quote(asyncio.run(maybe_await(self.default_sql_value)))
+        else:
+            return quote(self.default_sql_value)
 
     def _get_null_val(self):
         if self.nullable:
@@ -98,10 +102,6 @@ class Field:
             return " UNIQUE"
         else:
             return ""
-
-    def is_real_type(self):
-        """To check if the field is a real data type"""
-        return True
 
 
 class IntegerField(Field):
@@ -141,14 +141,11 @@ class IntegerField(Field):
         elif self.small_int:
             pg_type = "SMALLINT"
 
-        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}{self._get_default_val()}"
-
-    def is_real_type(self):
-        return not self.auto_increment
+        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}"
 
 
-class AutoIncrementIDField(IntegerField):
-    """An auto increasing id field, used as the id row for models"""
+class AutoIncrementIntegerField(IntegerField):
+    """An automatically increasing integer field"""
 
     python = None
 
@@ -156,9 +153,6 @@ class AutoIncrementIDField(IntegerField):
         super().__init__(
             big_int=big_int, small_int=small_int, auto_increment=True, primary_key=True
         )
-
-    def is_real_type(self):
-        return False
 
 
 class CharField(Field):
@@ -173,7 +167,7 @@ class CharField(Field):
 
     def to_sql(self):
         pg_type = f"VARCHAR({self.max_length})" if self.max_length is not None else "TEXT"
-        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}{self._get_default_val()}"
+        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}"
 
 
 class FloatField(IntegerField):
@@ -183,7 +177,7 @@ class FloatField(IntegerField):
 
     def to_sql(self):  
         pg_type = "REAL"
-        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}{self._get_default_val()}"
+        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}"
 
 
 class TextField(CharField):
@@ -201,30 +195,13 @@ class DateTimeField(Field):
 
     python = datetime.datetime
 
-    def __init__(
-        self, auto_now_add: bool = False, timezone: str = False, **kwargs
-    ):
-        self.automatically_add = auto_now_add
-        self.timezone = timezone
+    def __init__(self, has_timezone=False, **kwargs):
+        self.has_timezone = has_timezone
         super().__init__(**kwargs)
 
-    def _get_default_val(self):
-        default = ""
-        if self.automatically_add:
-            default = " CURRENT_TIMESTAMP"
-            if self.timezone is not None:
-                default = f" DEFAULT (NOW() AT TIME ZONE '{self.timezone}')"
-            return default
-
-        else:
-            default = super()._get_default_val()
-            return default
-
-        return default
-
     def to_sql(self):
-        pg_type = "TIMESTAMP WITH TIME ZONE" if self.timezone is not None else "TIMESTAMP"
-        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}{self._get_default_val()}"
+        pg_type = "TIMESTAMP WITH TIME ZONE" if self.has_timezone is not None else "TIMESTAMP"
+        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}"
 
 
 class BooleanField(Field):
@@ -234,7 +211,7 @@ class BooleanField(Field):
 
     def to_sql(self):
         pg_type = "BOOL"
-        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}{self._get_default_val()}"
+        return f"{pg_type}{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}"
 
 
 class ForeignKey(Field):
@@ -242,7 +219,7 @@ class ForeignKey(Field):
         self,
         to,
         on_delete: str,
-        sql_type: Optional[str] = "INTEGER",
+        sql_type: str,
         column: str = "Id",
         **kwargs,
     ):
@@ -273,7 +250,7 @@ class ForeignKey(Field):
         self.on_delete = on_delete.upper()
 
     def to_sql(self):
-        sql = "{0.sql_type} REFERENCES {0.to}({0.column}) " "ON DELETE {0.on_delete}"
+        sql = "{0.sql_type} REFERENCES {0.to}({0.column}) ON DELETE {0.on_delete}"
         return sql.format(self)
 
     def is_real_type(self):
@@ -284,24 +261,20 @@ class JsonField(Field):
     python = dict
 
     def to_sql(self):
-        return f"JSON{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}{self._get_default_val()}"
+        return f"JSON{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}"
 
 
 class BinaryField(Field):
     python = bytes
 
     def to_sql(self):
-        null = ""
-        unique = ""
-        if not self.nullable:
-            null = " NOT NULL"
-        if self.is_unique:
-            unique = " UNIQUE"
 
-        return f"BYTEA{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}{self._get_default_val()}"
+        return f"BYTEA{self._get_pk_val()}{self._get_unique_val()}{self._get_null_val()}"
 
 
 class ArrayField(Field):
+    python = list
+
     def __init__(self, sql_type: str, **kwargs):
         self.sql_type = sql_type
         super().__init__(**kwargs)
@@ -310,8 +283,13 @@ class ArrayField(Field):
         return "{0.sql_type} ARRAY".format(self)
 
 class DateField(Field):
-    pass
+    python = datetime.date
 
+    def __init__(self):
+        raise NotImplementedError
 
 class TimeDeltaField(Field):
-    pass
+    python = datetime.timedelta
+
+    def __init__(self):
+        raise NotImplementedError

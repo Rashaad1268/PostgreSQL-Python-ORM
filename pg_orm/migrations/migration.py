@@ -1,10 +1,13 @@
 import asyncio
+import os
 import logging
 import json
 from pathlib import Path
 import psycopg2
 import asyncpg
 from typing import Union, Type
+
+from psycopg2 import errors
 
 from pg_orm.models.base_model import Model, AsyncModel
 from pg_orm.migrations.schema_diff import SchemaDifference
@@ -15,7 +18,7 @@ loop = asyncio.get_event_loop()
 
 
 def _get_data_file(cls: Union[Type[Model], Type[AsyncModel]], directory):
-    return Path(f"{directory}\\{cls.__name__}.json")
+    return Path(os.path.join(directory, cls.__name__ + ".json"))
 
 
 def _write_migrations(cls: Union[Type[Model], Type[AsyncModel]], directory="migrations"):
@@ -31,7 +34,7 @@ def _write_migrations(cls: Union[Type[Model], Type[AsyncModel]], directory="migr
             json.dump(table_data, fp, indent=4, ensure_ascii=True)
 
     else:
-        with data_file.open("w", encoding="utf-8") as fp:
+        with data_file.open("w+", encoding="utf-8") as fp:
             json.dump(table_data, fp, indent=4, ensure_ascii=True)
 
 

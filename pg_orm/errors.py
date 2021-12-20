@@ -25,9 +25,7 @@ class ValidationError(DBError):
 
 class DataBaseNotConfigured(DBError):
     """Raised when the database is not properly configured"""
-    def __init__(self, function_name: str = None):
-        message = "DataBase is not properly configured."
-        if function_name:
-            message += f"\nPlease use {function_name} and configure the database properly."
 
-        super().__init__(message)
+    def __init__(self):
+        super().__init__("DataBase is not properly configured."
+                         "\nUse pg_orm.init_db and configure the database properly.")

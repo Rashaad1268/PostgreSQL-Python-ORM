@@ -10,9 +10,8 @@ class QueryGenerator:
 
     def generate_table_creation_query(self):
         model = self.model
-        columns = [f"{field.column_name} {field.to_sql()}" for field in model.fields]
-        return ("CREATE TABLE IF NOT EXISTS %s (%s)" % (
-            model.table_name, ",\n".join(columns)))
+        columns = [f"{field.column_name} {field.to_sql()}" for field in model.fields.values()]
+        return "CREATE TABLE IF NOT EXISTS %s (%s)" % (model.table_name, ",\n".join(columns))
 
     def generate_insert_query(self, return_inserted=False, asyncpg=False, **kwargs):
         model = self.model
@@ -57,8 +56,8 @@ class QueryGenerator:
         else:
             values = self._get_asyncpg_values(kwargs)
             new_values = ", ".join(values)
-            query = f"UPDATE {self.table_name} SET {new_values} WHERE id=${len(values) + 1}"
-            return query, tuple(kwargs.values), id
+            query = f"UPDATE {self.model.table_name} SET {new_values} WHERE id=${len(values) + 1}"
+            return query, tuple(kwargs.values()), id
 
     def generate_row_deletion_query(self, asyncpg=False, *, column="id", **kwargs):
         # column is a key word argument to prevent it being accidentally passed in

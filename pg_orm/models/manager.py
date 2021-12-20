@@ -18,7 +18,8 @@ class Manager:
         """Returns a single row with the given values"""
         self.model(**kwargs)
         query, args = self.model._query_gen.generate_select_query(**kwargs)
-        return self._return_model(self.db.fetchone(query, *args))
+        r = self.db.fetchone(query, *args)
+        return self._return_model(r)
 
     def filter(self, **kwargs) -> QuerySet:
         """Similar to get but returns multiple rows if exists"""
@@ -59,7 +60,7 @@ class Manager:
         self.model(**kwargs)
         query, values = self.model._query_gen.generate_insert_query(True, **kwargs)
 
-        for field in self.model.fields:
+        for field in self.model.fields.values():
             for validator in field.validators:
                 for key, value in kwargs.items():
                     if field.column_name == key:
