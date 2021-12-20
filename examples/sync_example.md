@@ -1,5 +1,7 @@
 ```python
 # models.py file
+from datetime import datetime
+
 import pg_orm
 from pg_orm import models, migrations
 from psycopg2 import pool
@@ -14,7 +16,7 @@ class Post(models.Model, table_name="Post"):
     # If one is not already set
     title = models.CharField(max_length=255)
     body = models.TextField()
-    date_created = models.DateTimeField(auto_now_add=True) # Now the date_created will be automatically set
+    date_created = models.DateTimeField(default=datetime.now) # Now the date_created will be automatically set
 
 migrations.migrate_all()
 

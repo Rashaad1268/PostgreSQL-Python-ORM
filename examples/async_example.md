@@ -1,7 +1,9 @@
 ```python
 # models.py file
-import asyncpg
 import asyncio
+from datetime import datetime
+
+import asyncpg
 
 import pg_orm
 from pg_orm import models, migrations
@@ -17,7 +19,7 @@ class Post(models.AsyncModel, table_name="Post"):
     # An id field will be automatically set by the library
     title = models.CharField(max_length=255)
     body = models.TextField()
-    date_created = models.DateTimeField(auto_now_add=True) # Now the date_created will be automatically set
+    date_created = models.DateTimeField(default=datetime.now) # Now the date_created will be automatically set
 
 run(migrations.async_migrate_all())
 

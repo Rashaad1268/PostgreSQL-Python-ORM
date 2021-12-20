@@ -14,12 +14,14 @@ If you are using `pg_orm.models.Model`
 # migrations.py
 from pg_orm import migrations
 
-migrations.migrate(Post)  # Pass in the model class
+migrations.migrate(Post)  # Pass in your model
 ```
 
 The above method can be used to apply migrations for a single model.
 
-If you want to apply migrations to all of your models
+If you want to apply migrations to all of your models  
+(recommended method if you have multiple models)
+
 
 ```python
 # migrations.py
@@ -39,4 +41,4 @@ from asyncio import get_event_loop
 get_event_loop().run_until_complete(migrations.async_migrate(Post))  # Pass in the model class
 ```
 
-If you want to apply migrations to all of the models use `pg_orm.migrations.async_migrate_all`
+If you want to apply migrations to all of the models use `pg_orm.migrations.async_migrate_all()`
