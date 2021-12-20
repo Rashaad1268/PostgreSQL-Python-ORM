@@ -1,4 +1,5 @@
 import inspect
+import asyncio
 from distutils.util import strtobool
 
 
@@ -18,8 +19,8 @@ def quote(arg=None):
                 return f"'{str(arg)}'"
 
 
-async def maybe_await(function, *args, **kwargs):
-    if inspect.iscoroutine(function):
-        return await function(*args, **kwargs)
+def maybe_await(function, *args, **kwargs):
+    if inspect.iscoroutinefunction(function):
+        return asyncio.get_event_loop().run_until_complete(function(*args, **kwargs))
     else:
         return function(*args, **kwargs)
