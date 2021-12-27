@@ -20,5 +20,5 @@ setuptools.setup(
         "Programming Language :: Python :: 3.9",
     ],
     include_package_data=True,
-    install_requires=["psycopg2", "asyncpg"],
+    install_requires=[],
 )
