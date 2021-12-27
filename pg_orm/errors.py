@@ -29,3 +29,8 @@ class DataBaseNotConfigured(DBError):
     def __init__(self):
         super().__init__("DataBase is not properly configured."
                          "\nUse pg_orm.init_db and configure the database properly.")
+
+
+class DataBaseDriverNotInstalled(DBError):
+    def __init__(self, driver, feature):
+        super().__init__(f"{driver} needs to be installed to use the {feature} ORM")
