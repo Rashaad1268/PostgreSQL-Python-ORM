@@ -9,7 +9,7 @@ from pg_orm.errors import FiledError, DataBaseNotConfigured
 from pg_orm.models.fields import Field, AutoIncrementIntegerField
 from pg_orm.models.manager import Manager, AsyncManager
 from pg_orm.models.query_generator import QueryGenerator
-from pg_orm.models.database import Psycopg2Driver, AsyncpgDriver
+from pg_orm.models.database import Psycopg2Wrapper, AsyncpgWrapper
 from pg_orm.models.utils import maybe_await
 
 log = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class ModelMeta(type):
 
 
 class BaseModel:
-    db: t.Union[Psycopg2Driver, AsyncpgDriver, None] = None
+    db: t.Union[Psycopg2Wrapper, AsyncpgWrapper] = None
     attrs: t.Dict[str, t.Any]
     fields: t.Dict[str, Field]
     table_name: str
