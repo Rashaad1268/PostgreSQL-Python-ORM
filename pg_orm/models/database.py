@@ -1,30 +1,52 @@
 from abc import ABC, abstractmethod
-
-from psycopg2 import pool
-import asyncpg
+import sqlite3
 
 
+try:
+    import asyncpg
+except ModuleNotFoundError:
+    asyncpg = None
+try:
+    from psycopg2 import pool
+except ModuleNotFoundError:
+    psycopg2 = None
 
-class DatabaseDriver(ABC):
+
+class DatabaseWrapper(ABC):
+    @property
     @abstractmethod
-    def execute(self):
+    def vendor(self):
+        pass
+
+    @property
+    @abstractmethod
+    def queryparam_style(self):
         pass
 
     @abstractmethod
-    def fetch(self):
+    def execute(self, *args, **kwargs):
         pass
 
     @abstractmethod
-    def fetchall(self):
+    def fetchone(self, *args, **kwargs):
         pass
 
     @abstractmethod
-    def fetchval(self):
+    def fetchall(self, *args, **kwargs):
         pass
 
-class Psycopg2Driver:
-    def __init__(self, pool: pool.AbstractConnectionPool):
+
+class Psycopg2Wrapper(DatabaseWrapper):
+    def __init__(self, pool: pool.SimpleConnectionPool):
         self.pool = pool
+
+    @property
+    def vendor(self):
+        return "postgresql"
+
+    @property
+    def queryparam_style(self):
+        return "format"
 
     def execute(self, query, *args, commit=True):
         with self.pool.getconn() as conn:
@@ -63,44 +85,67 @@ class Psycopg2Driver:
 
         return query_set
 
-    
-    def fetchval(self, query, *args, commit=False):
-        query_set = {}
-        with self.pool.getconn() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(query, args)
-                if commit:
-                    conn.commit()
-                result = cursor.fetchone()
-                if result:
-                    column_names = [desc[0] for desc in cursor.description]
-                    query_set = dict(zip(column_names, result))
-                self.pool.putconn(conn)
 
-        return query_set
-
-
-
-class AsyncpgDriver:
+class AsyncpgWrapper(DatabaseWrapper):
     def __init__(self, pool: asyncpg.Pool):
-        self.pool = pool
+        self.pool: asyncpg.Pool = pool
+
+    @property
+    def vendor(self):
+        return "postgresql"
+
+    @property
+    def queryparam_style(self):
+        return "native_postgresql"
 
     async def execute(self, query, *args):
         result = await self.pool.execute(query, *args)
 
         return result
 
-    async def fetch(self, query, *args):
+    async def fetchall(self, query, *args):
         result = await self.pool.fetch(query, *args)
 
         return result
 
-    async def fetchrow(self, query, *args):
+    async def fetchone(self, query, *args):
         result = await self.pool.fetchrow(query, *args)
 
         return result
 
-    async def fetchval(self, query, *args):
-        result = await self.pool.fetchval(query, * args)
 
-        return result
+class SQLite3Wrapper(DatabaseWrapper):
+    def __init__(self, connection):
+        self.connection: sqlite3.Connection = connection
+
+        def dict_factory(cursor, row):
+            d = {}
+            for idx, col in enumerate(cursor.description):
+                d[col[0]] = row[idx]
+            return d
+
+        self.connection.row_factory = dict_factory
+
+    @property
+    def vendor(self):
+        return "sqlite"
+
+    @property
+    def queryparam_style(self):
+        return "qmark"
+
+    def execute(self, query, *args, commit=True):
+        with self.connection.cursor() as cursor:
+            cursor.execute(query, *args)
+            if commit:
+                self.connection.commit()
+
+    def fetchall(self, query, *args):
+        with self.connection.cursor() as cursor:
+            cursor.execute(query, *args)
+            return cursor.fetchall()
+
+    def fetchone(self, query, *args):
+        with self.connection.cursor() as cursor:
+            cursor.execute(query, *args)
+            return cursor.fetchone()
