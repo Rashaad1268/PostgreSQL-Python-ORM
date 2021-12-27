@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 import sqlite3
 
@@ -7,9 +9,9 @@ try:
 except ModuleNotFoundError:
     asyncpg = None
 try:
-    from psycopg2 import pool
+    from psycopg2.pool import SimpleConnectionPool
 except ModuleNotFoundError:
-    psycopg2 = None
+    SimpleConnectionPool = None
 
 
 class DatabaseWrapper(ABC):
@@ -37,8 +39,8 @@ class DatabaseWrapper(ABC):
 
 
 class Psycopg2Wrapper(DatabaseWrapper):
-    def __init__(self, pool: pool.SimpleConnectionPool):
-        self.pool = pool
+    def __init__(self, pool):
+        self.pool: SimpleConnectionPool = pool
 
     @property
     def vendor(self):
@@ -87,7 +89,7 @@ class Psycopg2Wrapper(DatabaseWrapper):
 
 
 class AsyncpgWrapper(DatabaseWrapper):
-    def __init__(self, pool: asyncpg.Pool):
+    def __init__(self, pool):
         self.pool: asyncpg.Pool = pool
 
     @property
